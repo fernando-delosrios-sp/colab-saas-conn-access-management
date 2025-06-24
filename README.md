@@ -83,7 +83,7 @@ The connector requires the following configuration:
 -   **Require Approval**: Enable approval requirement
 -   **Approver Type**: Choose approver (Owner, Manager)
 -   **Automatic Assignment**: Enable automatic role assignment
--   **Assignment Definition**: Define membership criteria for automatic assignment
+-   **Assignment Definition**: Define membership criteria for automatic assignment. Thanks to [Yannick Béot](https://github.com/yannick-beot-sp) for this feature.
 
 ## Development
 
