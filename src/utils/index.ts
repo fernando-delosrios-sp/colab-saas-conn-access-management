@@ -1,6 +1,7 @@
 import { EntitlementRefV2025, EntitlementV2025 } from 'sailpoint-api-client'
-import { Definition } from './model/config'
+import { Definition } from '../model/config'
 import velocityjs from 'velocityjs'
+import { stringToMembership } from './membership-parser'
 
 export const normalizeAttributes = (entitlement: EntitlementV2025, _group: string | undefined): EntitlementV2025 => {
     const attributes = {
@@ -14,8 +15,8 @@ export const normalizeAttributes = (entitlement: EntitlementV2025, _group: strin
     return { ...entitlement, attributes }
 }
 
-export const buildAccessProfileName = (entitlement: EntitlementV2025, definition: Definition): string => {
-    const template = velocityjs.parse(definition.apTemplate)
+export const buildName = (entitlement: EntitlementV2025, definition: Definition): string => {
+    const template = velocityjs.parse(definition.nameTemplate)
 
     const velocity = new velocityjs.Compile(template)
     const name = velocity.render(entitlement.attributes)
@@ -30,3 +31,5 @@ export const entitlementToRef = (entitlement: EntitlementV2025): EntitlementRefV
         type: 'ENTITLEMENT',
     }
 }
+
+export { stringToMembership }

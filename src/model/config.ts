@@ -3,11 +3,22 @@ export interface Definition {
     query: string
     groupByAttribute?: boolean
     groupAttribute?: string
-    groupType?: 'application' | 'accessProfile'
-    apTemplate: string
-    createApplication?: boolean
+    nameTemplate: string
     requestable: boolean
+    requireApproval: boolean
+}
+
+export interface AccessProfileDefinition extends Definition {
     approverType?: 'APP_OWNER' | 'OWNER' | 'SOURCE_OWNER' | 'MANAGER'
+    groupType?: 'application' | 'accessProfile'
+    nameTemplate: string
+    createApplication: boolean
+}
+
+export interface RoleDefinition extends Definition {
+    approverType?: 'OWNER' | 'MANAGER'
+    automaticAssignment: boolean
+    assignmentDefinition?: string
 }
 
 export interface Config {
@@ -17,5 +28,6 @@ export interface Config {
     baseurl: string
     clientId: string
     clientSecret: string
-    definitions?: Definition[]
+    accessProfiles?: AccessProfileDefinition[]
+    roles?: RoleDefinition[]
 }

@@ -103,6 +103,13 @@ Content-Type: application/json
     },
   "config": {{config}}
 }
+
+HTTP/1.1 500  - Internal Server Error
+x-powered-by: Express
+content-type: application/x-ndjson
+date: Mon, 16 Jun 2025 14:50:43 GMT
+connection: close
+transfer-encoding: chunked
 ###
 # Account disable
 POST {{url}}

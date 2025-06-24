@@ -8,9 +8,15 @@ import {
 } from '@sailpoint/connector-sdk'
 import { ISCClient } from './isc-client'
 import { Config } from './model/config'
-import { AccessProfileV2025, EntitlementV2025, JsonPatchOperationV2025, SourceAppV2025 } from 'sailpoint-api-client'
-import { AccessProfileDefinition, ApplicationDefinition } from './model/definitions'
-import { buildAccessProfileName, entitlementToRef, normalizeAttributes } from './utils'
+import {
+    AccessProfileV2025,
+    EntitlementV2025,
+    JsonPatchOperationV2025,
+    RoleV2025,
+    SourceAppV2025,
+} from 'sailpoint-api-client'
+import { AccessProfileProperties, ApplicationProperties, RoleProperties } from './model/propertyDefinitions'
+import { buildName, entitlementToRef, normalizeAttributes, stringToMembership } from './utils'
 
 // Connector must be exported as module property named connector
 export const connector = async () => {
@@ -32,13 +38,14 @@ export const connector = async () => {
     }
 
     const stdEntitlementList: StdEntitlementListHandler = async (context, input, res) => {
-        if (config.definitions) {
-            logger.debug(`Processing ${config.definitions.length} definitions`)
-            const applicationMap = new Map<string, ApplicationDefinition>()
-            const accessProfileMap = new Map<string, AccessProfileDefinition>()
+        // Access profiles
+        if (config.accessProfiles) {
+            logger.debug(`Processing ${config.accessProfiles.length} accessProfiles`)
+            const applicationMap = new Map<string, ApplicationProperties>()
+            const accessProfileMap = new Map<string, AccessProfileProperties>()
             const entitlementMap = new Map<string, EntitlementV2025[]>()
             // Process each definition
-            definitions: for (const definition of config.definitions) {
+            accessProfiles: for (const definition of config.accessProfiles) {
                 logger.debug(`Processing definition: ${definition.name}`)
                 const entitlements = await isc.listEntitlements(definition.query)
                 logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
@@ -65,7 +72,7 @@ export const connector = async () => {
                                 }
                             } else {
                                 logger.error(`Definition ${definition.name} has no groupAttribute defined`)
-                                continue definitions
+                                continue accessProfiles
                             }
                         } else {
                             entitlement = normalizeAttributes(entitlement, definition.name)
@@ -93,14 +100,14 @@ export const connector = async () => {
                 }
                 groups: for (const groupName of entitlementMap.keys()) {
                     logger.debug(`Processing group: ${groupName}`)
-                    let sourceId: string | undefined
+                    let sourceId: string
                     let ownerId: string | undefined
                     let app: SourceAppV2025 | undefined
 
                     entitlements: for (const entitlement of entitlementMap.get(groupName)!) {
                         logger.debug(`Processing entitlement in group: ${entitlement.name}`)
                         const entitlementRef = entitlementToRef(entitlement)
-                        sourceId = sourceId ?? entitlement.source!.id!
+                        sourceId = entitlement.source!.id!
                         ownerId = ownerId ?? (await isc.getSource(sourceId)).owner!.id!
                         const appName = definition.groupType === 'accessProfile' ? definition.name : groupName
                         if (definition.createApplication) {
@@ -121,14 +128,14 @@ export const connector = async () => {
                             }
                         }
 
-                        const name = buildAccessProfileName(entitlement, definition)
+                        const name = buildName(entitlement, definition)
                         logger.debug(`Preparing access profile: ${name}`)
-                        let accessProfileDefinition: AccessProfileDefinition
+                        let accessProfileProperties: AccessProfileProperties
                         if (accessProfileMap.has(name)) {
-                            accessProfileDefinition = accessProfileMap.get(name)!
-                            accessProfileDefinition.entitlements.push(entitlementRef)
+                            accessProfileProperties = accessProfileMap.get(name)!
+                            accessProfileProperties.entitlements.push(entitlementRef)
                         } else {
-                            accessProfileDefinition = {
+                            accessProfileProperties = {
                                 appName,
                                 ownerId,
                                 sourceId,
@@ -136,7 +143,7 @@ export const connector = async () => {
                                 requestable: definition.requestable,
                             }
                             if (definition.approverType) {
-                                accessProfileDefinition.accessRequestConfig = {
+                                accessProfileProperties.accessRequestConfig = {
                                     approvalSchemes: [
                                         {
                                             approverType: definition.approverType,
@@ -148,9 +155,9 @@ export const connector = async () => {
                             logger.debug(`Checking for existing access profile: ${name}`)
                             const existingAp = await isc.getAccessProfileByName(name)
                             if (existingAp) {
-                                accessProfileDefinition.id = existingAp.id
+                                accessProfileProperties.id = existingAp.id
                             }
-                            accessProfileMap.set(name, accessProfileDefinition)
+                            accessProfileMap.set(name, accessProfileProperties)
                         }
                     }
                 }
@@ -245,6 +252,150 @@ export const connector = async () => {
                     },
                 ]
                 const updatedApp = await isc.updateSourceAccessProfiles(app.appId!, updateApplication)
+            }
+        }
+
+        // Roles
+        if (config.roles) {
+            logger.debug(`Processing ${config.roles.length} roles`)
+            const roleMap = new Map<string, RoleProperties>()
+            const entitlementMap = new Map<string, EntitlementV2025[]>()
+
+            const sources = await isc.listSources()
+            const source = sources.find(
+                (x) => (x.connectorAttributes as any).spConnectorInstanceId === config.spConnectorInstanceId
+            )!
+
+            if (!source) {
+                const error = `Unable to find source with spConnectorInstanceId "${config.spConnectorInstanceId}"`
+                throw new ConnectorError(error)
+            }
+
+            const sourceId = source.id!
+
+            // Process each definition
+            roles: for (const definition of config.roles) {
+                logger.debug(`Processing definition: ${definition.name}`)
+                const entitlements = await isc.listEntitlements(definition.query)
+                logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
+                // Get entitlements, access profiles, and applications from each entitlement found
+                entitlements: for (let entitlement of entitlements) {
+                    logger.debug(`Processing entitlement: ${entitlement.name} (${entitlement.id})`)
+                    if (definition.groupByAttribute) {
+                        entitlement = normalizeAttributes(entitlement, definition.name)
+                        const name = entitlement.attributes![definition.groupAttribute!]
+                        if (name) {
+                            logger.debug(`Grouping by attribute ${definition.groupAttribute} with value ${name}`)
+                            if (!entitlementMap.has(definition.name)) {
+                                entitlementMap.set(definition.name, [])
+                            }
+                            entitlementMap.get(definition.name)?.push(entitlement)
+                        } else {
+                            logger.error(`Entitlement ${entitlement.id} has no ${definition.groupAttribute} attribute`)
+                        }
+                    } else {
+                        logger.debug(`No grouping defined for entitlement ${entitlement.name}`)
+                        entitlement = normalizeAttributes(entitlement, definition.name)
+                        if (!entitlementMap.has(definition.name)) {
+                            entitlementMap.set(definition.name, [])
+                        }
+                        entitlementMap.get(definition.name)?.push(entitlement)
+                    }
+                }
+                groups: for (const groupName of entitlementMap.keys()) {
+                    logger.debug(`Processing group: ${groupName}`)
+                    let ownerId: string | undefined
+
+                    entitlements: for (const entitlement of entitlementMap.get(groupName)!) {
+                        logger.debug(`Processing entitlement in group: ${entitlement.name}`)
+                        const entitlementRef = entitlementToRef(entitlement)
+                        ownerId = source.owner!.id!
+
+                        const name = buildName(entitlement, definition)
+                        logger.debug(`Preparing role: ${name}`)
+                        let roleProperties: RoleProperties
+                        if (roleMap.has(name)) {
+                            roleProperties = roleMap.get(name)!
+                            roleProperties.entitlements.push(entitlementRef)
+                        } else {
+                            roleProperties = {
+                                ownerId,
+                                entitlements: [entitlementRef],
+                                requestable: definition.requestable,
+                            }
+                            if (definition.approverType) {
+                                roleProperties.accessRequestConfig = {
+                                    approvalSchemes: [
+                                        {
+                                            approverType: definition.approverType,
+                                        },
+                                    ],
+                                }
+                            }
+
+                            if (definition.assignmentDefinition) {
+                                const membership = await stringToMembership(definition.assignmentDefinition, sources)
+                                roleProperties.membership = membership
+                            }
+
+                            logger.debug(`Checking for existing role: ${name}`)
+                            const existingRole = await isc.getRoleByName(name)
+                            if (existingRole) {
+                                roleProperties.id = existingRole.id
+                            }
+                            roleMap.set(name, roleProperties)
+                        }
+                    }
+                }
+            }
+
+            // Create/update roles
+            for (const [roleName, role] of roleMap.entries()) {
+                const { id, ownerId, entitlements, requestable, accessRequestConfig, membership } = role
+                let rolePayload: RoleV2025
+                if (id) {
+                    logger.debug(`Updating existing role: ${roleName}`)
+                    const roleUpdate: JsonPatchOperationV2025[] = [
+                        {
+                            op: 'replace',
+                            path: '/entitlements',
+                            value: entitlements,
+                        },
+                    ]
+                    if (requestable) {
+                        roleUpdate.push({
+                            op: 'replace',
+                            path: '/requestable',
+                            value: true,
+                        })
+                    }
+                    if (accessRequestConfig) {
+                        roleUpdate.push({
+                            op: 'replace',
+                            path: '/accessRequestConfig',
+                            value: accessRequestConfig,
+                        })
+                    }
+                    if (membership) {
+                        roleUpdate.push({
+                            op: 'replace',
+                            path: '/membership',
+                            value: membership,
+                        })
+                    }
+                    rolePayload = await isc.updateRole(id, roleUpdate)
+                } else {
+                    logger.debug(`Creating new role: ${roleName}`)
+                    rolePayload = await isc.createRole(
+                        roleName,
+                        ownerId,
+                        entitlements,
+                        requestable,
+                        accessRequestConfig,
+                        membership
+                    )
+                    role.id = rolePayload.id!
+                }
             }
         }
     }
