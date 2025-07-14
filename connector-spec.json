@@ -1,0 +1,354 @@
+{
+    "name": "Access Management",
+    "description": "Access Management Connector for automated application, access profile and role management",
+    "commands": ["std:entitlement:list", "std:test-connection"],
+    "showDebugLoggingOption": true,
+    "sourceConfigInitialValues": {
+        "accessProfiles.nameTemplate": "$name ($_source)",
+        "roles.nameTemplate": "$name"
+    },
+    "sourceConfig": [
+        {
+            "type": "menu",
+            "label": "Connection Details",
+            "items": [
+                {
+                    "type": "section",
+                    "sectionTitle": "Identity Security Cloud connection configuration",
+                    "sectionHelpMessage": "Configuration details for Identity Security Cloud Tenant",
+                    "items": [
+                        {
+                            "key": "baseurl",
+                            "label": "Identity Security Cloud API URL",
+                            "type": "url",
+                            "required": true
+                        },
+                        {
+                            "key": "clientId",
+                            "label": "Personal Access Token ID",
+                            "type": "text",
+                            "required": true
+                        },
+                        {
+                            "key": "clientSecret",
+                            "label": "Personal Access Token secret",
+                            "type": "secret",
+                            "required": true
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "menu",
+            "label": "Access Profiles",
+            "items": [
+                {
+                    "type": "section",
+                    "sectionTitle": "Access Profiles Configuration",
+                    "sectionHelpMessage": "Add your access profile definitions here",
+                    "items": [
+                        {
+                            "key": "accessProfiles",
+                            "label": "Access Profile Group Definitions",
+                            "titleKey": "query",
+                            "subtitleKey": "name",
+                            "dragNDropEnabled": true,
+                            "deleteButton": true,
+                            "editButton": true,
+                            "addButton": true,
+                            "copyButton": true,
+                            "buttonLabel": "New Access Profile Group Definition",
+                            "type": "cardList",
+                            "helpKey": "Add definitions to build your access profiles",
+                            "subMenus": [
+                                {
+                                    "label": "Group configuration",
+                                    "items": [
+                                        {
+                                            "key": "name",
+                                            "label": "Access Profile Group Name",
+                                            "type": "text",
+                                            "required": true,
+                                            "helpKey": "Access Profile Group Name"
+                                        },
+                                        {
+                                            "key": "query",
+                                            "label": "Entitlement query",
+                                            "helpKey": "Entitlement query (filter) for Entitlement API",
+                                            "type": "text",
+                                            "required": true
+                                        },
+                                        {
+                                            "key": "groupByAttribute",
+                                            "label": "Group entitlements by attribute?",
+                                            "type": "checkbox",
+                                            "helpKey": "Group entitlements to build access profiles"
+                                        },
+                                        {
+                                            "key": "groupAttribute",
+                                            "label": "Group Attribute",
+                                            "helpKey": "Entitlement attribute to group by",
+                                            "type": "text",
+                                            "parentKey": "groupByAttribute",
+                                            "parentValue": "true",
+                                            "required": true
+                                        },
+                                        {
+                                            "key": "groupType",
+                                            "label": "Group Type",
+                                            "helpKey": "Choose how to group entitlements",
+                                            "type": "select",
+                                            "required": true,
+                                            "parentKey": "groupByAttribute",
+                                            "parentValue": "true",
+                                            "options": [
+                                                {
+                                                    "label": "Application",
+                                                    "value": "application"
+                                                },
+                                                {
+                                                    "label": "Access Profile",
+                                                    "value": "accessProfile"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "key": "createApplication",
+                                            "label": "Create application?",
+                                            "type": "checkbox",
+                                            "helpKey": "Create application and assign to access profiles"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "label": "Access Profile configuration",
+                                    "items": [
+                                        {
+                                            "key": "nameTemplate",
+                                            "label": "Access Profile Name Template",
+                                            "type": "text",
+                                            "required": true,
+                                            "helpKey": "Velocity template for building access profile names. Use $_source for source name and $_group for group name. Use $name for entitlement name and $value for entitlement value. Any other attributes from the schema can be used as well."
+                                        },
+                                        {
+                                            "key": "requestable",
+                                            "label": "Requestable",
+                                            "type": "checkbox",
+                                            "helpKey": "Make access profiles requestable",
+                                            "required": true
+                                        },
+                                        {
+                                            "key": "requireApproval",
+                                            "label": "Require approval?",
+                                            "type": "checkbox",
+                                            "parentKey": "requestable",
+                                            "parentValue": "true",
+                                            "helpKey": "Require approval on request",
+                                            "required": true
+                                        },
+                                        {
+                                            "key": "approverType",
+                                            "label": "Approver",
+                                            "helpKey": "Select request approver",
+                                            "type": "select",
+                                            "required": true,
+                                            "parentKey": "requireApproval",
+                                            "parentValue": "true",
+                                            "options": [
+                                                {
+                                                    "label": "Application Owner",
+                                                    "value": "APP_OWNER"
+                                                },
+                                                {
+                                                    "label": "Owner",
+                                                    "value": "OWNER"
+                                                },
+                                                {
+                                                    "label": "Source Owner",
+                                                    "value": "SOURCE_OWNER"
+                                                },
+                                                {
+                                                    "label": "Manager",
+                                                    "value": "MANAGER"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "menu",
+            "label": "Roles",
+            "items": [
+                {
+                    "type": "section",
+                    "sectionTitle": "Roles Configuration",
+                    "sectionHelpMessage": "Add your role definitions here",
+                    "items": [
+                        {
+                            "key": "roles",
+                            "label": "Role Group Definitions",
+                            "titleKey": "query",
+                            "subtitleKey": "name",
+                            "dragNDropEnabled": true,
+                            "deleteButton": true,
+                            "editButton": true,
+                            "addButton": true,
+                            "copyButton": true,
+                            "buttonLabel": "New Role Group Definition",
+                            "type": "cardList",
+                            "helpKey": "Add definitions to build your roles",
+                            "subMenus": [
+                                {
+                                    "label": "Group configuration",
+                                    "items": [
+                                        {
+                                            "key": "name",
+                                            "label": "Role Group Name",
+                                            "type": "text",
+                                            "required": true,
+                                            "helpKey": "Role Group Name"
+                                        },
+                                        {
+                                            "key": "query",
+                                            "label": "Entitlement query",
+                                            "helpKey": "Entitlement query (filter) for Entitlement API",
+                                            "type": "text",
+                                            "required": true
+                                        },
+                                        {
+                                            "key": "groupByAttribute",
+                                            "label": "Group entitlements by attribute?",
+                                            "type": "checkbox",
+                                            "helpKey": "Group entitlements to build roles"
+                                        },
+                                        {
+                                            "key": "groupAttribute",
+                                            "label": "Group Attribute",
+                                            "helpKey": "Entitlement attribute to group by",
+                                            "type": "text",
+                                            "parentKey": "groupByAttribute",
+                                            "parentValue": "true",
+                                            "required": true
+                                        }
+                                    ]
+                                },
+                                {
+                                    "label": "Role configuration",
+                                    "items": [
+                                        {
+                                            "key": "nameTemplate",
+                                            "label": "Role Name Template",
+                                            "type": "text",
+                                            "required": true,
+                                            "helpKey": "Velocity template for building role names. Use $_source for source name and $_group for group name. Use $name for entitlement name and $value for entitlement value. Any other attributes from the schema can be used as well."
+                                        },
+                                        {
+                                            "key": "requestable",
+                                            "label": "Requestable",
+                                            "type": "checkbox",
+                                            "helpKey": "Make access profiles requestable",
+                                            "required": true
+                                        },
+                                        {
+                                            "key": "requireApproval",
+                                            "label": "Require approval?",
+                                            "type": "checkbox",
+                                            "parentKey": "requestable",
+                                            "parentValue": "true",
+                                            "helpKey": "Require approval on request",
+                                            "required": true
+                                        },
+                                        {
+                                            "key": "approverType",
+                                            "label": "Approver",
+                                            "helpKey": "Select request approver",
+                                            "type": "select",
+                                            "required": true,
+                                            "parentKey": "requireApproval",
+                                            "parentValue": "true",
+                                            "options": [
+                                                {
+                                                    "label": "Owner",
+                                                    "value": "OWNER"
+                                                },
+                                                {
+                                                    "label": "Manager",
+                                                    "value": "MANAGER"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "key": "automaticAssignment",
+                                            "label": "Automatic Assignment?",
+                                            "type": "checkbox",
+                                            "parentKey": "requestable",
+                                            "parentValue": "true",
+                                            "helpKey": "Automatically assign role if criteria is met",
+                                            "required": true
+                                        },
+                                        {
+                                            "key": "assignmentDefinition",
+                                            "label": "Role Assignment Definition",
+                                            "type": "text",
+                                            "required": true,
+                                            "parentKey": "automaticAssignment",
+                                            "parentValue": "true",
+                                            "helpKey": "Check https://github.com/yannick-beot-sp/vscode-sailpoint-identitynow?tab=readme-ov-file#roles membershipCriteria for format details. Name template Velocity rules apply."
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "accountSchema": {
+        "displayAttribute": "name",
+        "identityAttribute": "id",
+        "attributes": [
+            {
+                "name": "id",
+                "type": "string",
+                "description": "ID"
+            },
+            {
+                "name": "name",
+                "type": "string",
+                "description": "Name"
+            }
+        ]
+    },
+    "entitlementSchemas": [
+        {
+            "type": "group",
+            "identityAttribute": "id",
+            "displayAttribute": "name",
+            "attributes": [
+                {
+                    "name": "id",
+                    "type": "string",
+                    "description": "Account type ID"
+                },
+                {
+                    "name": "name",
+                    "type": "string",
+                    "description": "Account type name"
+                },
+                {
+                    "name": "description",
+                    "type": "string",
+                    "description": "Description"
+                }
+            ]
+        }
+    ]
+}
