@@ -142,8 +142,8 @@ export const connector = async () => {
                                             )
                                             continue groups
                                         }
-                                        existingAppMap.set(app.name!, app)
-                                        applicationMap.set(app.name!, { appId: app.id!, sourceId, accessProfiles: [] })
+                                        existingAppMap.set(appName, app)
+                                        applicationMap.set(appName, { appId: app.id!, sourceId, accessProfiles: [] })
                                     } else {
                                         applicationMap.set(appName, { sourceId, accessProfiles: [] })
                                     }
@@ -224,16 +224,15 @@ export const connector = async () => {
 
                             if (!entitlementsChanged && !requestableChanged && !accessRequestConfigChanged) {
                                 logger.debug(`No changes detected for access profile ${apName}, skipping update`)
-                                continue
+                            } else {
+                                try {
+                                    logger.debug(`Updating existing access profile: ${apName}`)
+                                    accessProfile = await isc.updateAccessProfile(id, accessProfileUpdate)
+                                } catch (error) {
+                                    logger.error(`Error updating access profile: ${error}`)
+                                    continue
+                                }
                             }
-                        }
-
-                        try {
-                            logger.debug(`Updating existing access profile: ${apName}`)
-                            accessProfile = await isc.updateAccessProfile(id, accessProfileUpdate)
-                        } catch (error) {
-                            logger.error(`Error updating access profile: ${error}`)
-                            continue
                         }
                     } else {
                         logger.debug(`Creating new access profile: ${apName}`)
@@ -320,7 +319,6 @@ export const connector = async () => {
                             !matchAllAccountsChanged
                         ) {
                             logger.debug(`No changes detected for app ${appName}, skipping update`)
-                            continue
                         }
                     }
 
@@ -490,15 +488,15 @@ export const connector = async () => {
                                 !membershipChanged
                             ) {
                                 logger.debug(`No changes detected for role ${roleName}, skipping update`)
-                                continue
+                            } else {
+                                try {
+                                    logger.debug(`Updating existing role: ${roleName}`)
+                                    rolePayload = await isc.updateRole(id, roleUpdate)
+                                } catch (error) {
+                                    logger.error(`Error updating role: ${error}`)
+                                    continue
+                                }
                             }
-                        }
-                        try {
-                            logger.debug(`Updating existing role: ${roleName}`)
-                            rolePayload = await isc.updateRole(id, roleUpdate)
-                        } catch (error) {
-                            logger.error(`Error updating role: ${error}`)
-                            continue
                         }
                     } else {
                         logger.debug(`Creating new role: ${roleName}`)
