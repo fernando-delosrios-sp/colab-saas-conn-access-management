@@ -32,4 +32,30 @@ export const entitlementToRef = (entitlement: EntitlementV2025): EntitlementRefV
     }
 }
 
+export const areStringArraysEqual = (a?: string[], b?: string[]): boolean => {
+    const arrA = (a ?? []).slice().sort()
+    const arrB = (b ?? []).slice().sort()
+    if (arrA.length !== arrB.length) return false
+    return arrA.every((val, idx) => val === arrB[idx])
+}
+
+export const areEntitlementRefsEqual = (a?: { id?: string | null }[] | null, b?: { id?: string | null }[]): boolean => {
+    const idsA = (a ?? [])
+        .map((x) => x.id ?? undefined)
+        .filter(Boolean)
+        .slice()
+        .sort()
+    const idsB = (b ?? [])
+        .map((x) => x.id ?? undefined)
+        .filter(Boolean)
+        .slice()
+        .sort()
+    if (idsA.length !== idsB.length) return false
+    return idsA.every((val, idx) => val === idsB[idx])
+}
+
+export const areJsonEqual = (a: any, b: any): boolean => {
+    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+}
+
 export { stringToMembership }
