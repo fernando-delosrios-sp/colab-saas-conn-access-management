@@ -1,6 +1,6 @@
 {
     "name": "access-management",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "main": "dist/index.js",
     "scripts": {
         "clean": "shx rm -rf ./dist",
@@ -15,6 +15,7 @@
     "private": true,
     "dependencies": {
         "@sailpoint/connector-sdk": "^1.1.22",
+        "axios-retry": "^4.5.0",
         "form-data": "^4.0.2",
         "sailpoint-api-client": "^1.6.0",
         "velocityjs": "^2.1.5"

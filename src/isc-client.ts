@@ -31,8 +31,11 @@ import {
     SourcesApi,
     SourcesV2025Api,
 } from 'sailpoint-api-client'
+import axios from 'axios'
+import axiosRetry from 'axios-retry'
 import { TOKEN_URL_PATH } from './data/constants'
 import { Config } from './model/config'
+import { retriesConfig } from './axios'
 
 export class ISCClient {
     private config: Configuration
@@ -45,7 +48,9 @@ export class ISCClient {
             tokenUrl: new URL(config.baseurl).origin + TOKEN_URL_PATH,
         }
         this.config = new Configuration(conf)
+        this.config.retriesConfig = retriesConfig
         this.config.experimental = true
+        axiosRetry(axios as any, retriesConfig)
     }
 
     async getPublicIdentityConfig(): Promise<PublicIdentityConfig> {
@@ -69,12 +74,8 @@ export class ISCClient {
         const requestParameters: EntitlementsV2025ApiListEntitlementsRequest = {
             filters,
         }
-        const listEntitlements = () => {
-            return api.listEntitlements(requestParameters)
-        }
-
-        const response = await Paginator.paginate(api, listEntitlements)
-        return response.data
+        const response = await Paginator.paginate(api, api.listEntitlements, requestParameters)
+        return response.data as EntitlementV2025[]
     }
 
     async getAccessProfileByName(name: string): Promise<AccessProfileV2025 | undefined> {

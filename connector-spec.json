@@ -4,8 +4,7 @@
     "commands": ["std:entitlement:list", "std:test-connection"],
     "showDebugLoggingOption": true,
     "sourceConfigInitialValues": {
-        "accessProfiles.nameTemplate": "$name ($_source)",
-        "roles.nameTemplate": "$name"
+        "nameTemplate": "$name"
     },
     "sourceConfig": [
         {
@@ -82,7 +81,7 @@
                                         {
                                             "key": "groupByAttribute",
                                             "label": "Group entitlements by attribute?",
-                                            "type": "checkbox",
+                                            "type": "toggle",
                                             "helpKey": "Group entitlements to build access profiles"
                                         },
                                         {
@@ -116,7 +115,7 @@
                                         {
                                             "key": "createApplication",
                                             "label": "Create application?",
-                                            "type": "checkbox",
+                                            "type": "toggle",
                                             "helpKey": "Create application and assign to access profiles"
                                         }
                                     ]
@@ -134,18 +133,18 @@
                                         {
                                             "key": "requestable",
                                             "label": "Requestable",
-                                            "type": "checkbox",
+                                            "type": "toggle",
                                             "helpKey": "Make access profiles requestable",
-                                            "required": true
+                                            "required": false
                                         },
                                         {
                                             "key": "requireApproval",
                                             "label": "Require approval?",
-                                            "type": "checkbox",
+                                            "type": "toggle",
                                             "parentKey": "requestable",
                                             "parentValue": "true",
                                             "helpKey": "Require approval on request",
-                                            "required": true
+                                            "required": false
                                         },
                                         {
                                             "key": "approverType",
@@ -225,7 +224,7 @@
                                         {
                                             "key": "groupByAttribute",
                                             "label": "Group entitlements by attribute?",
-                                            "type": "checkbox",
+                                            "type": "toggle",
                                             "helpKey": "Group entitlements to build roles"
                                         },
                                         {
@@ -252,14 +251,14 @@
                                         {
                                             "key": "requestable",
                                             "label": "Requestable",
-                                            "type": "checkbox",
+                                            "type": "toggle",
                                             "helpKey": "Make access profiles requestable",
                                             "required": true
                                         },
                                         {
                                             "key": "requireApproval",
                                             "label": "Require approval?",
-                                            "type": "checkbox",
+                                            "type": "toggle",
                                             "parentKey": "requestable",
                                             "parentValue": "true",
                                             "helpKey": "Require approval on request",
@@ -287,7 +286,7 @@
                                         {
                                             "key": "automaticAssignment",
                                             "label": "Automatic Assignment?",
-                                            "type": "checkbox",
+                                            "type": "toggle",
                                             "parentKey": "requestable",
                                             "parentValue": "true",
                                             "helpKey": "Automatically assign role if criteria is met",
