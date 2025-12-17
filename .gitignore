@@ -19,5 +19,4 @@ dist/
 coverage/
 
 test/
-package-lock.json
 reports/
