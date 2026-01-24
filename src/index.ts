@@ -6,6 +6,7 @@ import {
     StdTestConnectionHandler,
     ConnectorError,
 } from '@sailpoint/connector-sdk'
+import velocityjs from 'velocityjs'
 import { ISCClient } from './isc-client'
 import { Config } from './model/config'
 import {
@@ -150,7 +151,7 @@ export const connector = async () => {
                                 }
                             }
 
-                            const name = buildName(entitlement, definition)
+                            const name = buildName(entitlement, definition.nameTemplate)
                             logger.debug(`Preparing access profile: ${name}`)
                             let accessProfileProperties: AccessProfileProperties
                             if (accessProfileMap.has(name)) {
@@ -390,7 +391,7 @@ export const connector = async () => {
                             const entitlementRef = entitlementToRef(entitlement)
                             ownerId = source.owner!.id!
 
-                            const name = buildName(entitlement, definition)
+                            const name = buildName(entitlement, definition.nameTemplate)
                             logger.debug(`Preparing role: ${name}`)
                             let roleProperties: RoleProperties
                             if (roleMap.has(name)) {
@@ -413,8 +414,9 @@ export const connector = async () => {
                                 }
 
                                 if (definition.assignmentDefinition) {
+                                    const assignmentDefinition = buildName(entitlement, definition.assignmentDefinition)
                                     const membership = await stringToMembership(
-                                        definition.assignmentDefinition,
+                                        assignmentDefinition,
                                         sources
                                     )
                                     roleProperties.membership = membership
