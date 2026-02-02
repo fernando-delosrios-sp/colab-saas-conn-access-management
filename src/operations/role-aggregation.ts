@@ -1,5 +1,5 @@
 import { logger, ConnectorError } from '@sailpoint/connector-sdk'
-import { EntitlementV2025, RequestabilityForRoleV2025, RoleV2025 } from 'sailpoint-api-client'
+import { EntitlementV2025, RequestabilityForRoleV2025 } from 'sailpoint-api-client'
 import { ISCClient, LightweightRole } from '../isc-client'
 import { Config } from '../model/config'
 import { RoleProperties } from '../model/propertyDefinitions'
@@ -80,61 +80,60 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
                 // Each unique expression result becomes a separate role
                 logger.debug(`Grouping by attribute ${definition.entitlementExpression} with value ${name}`)
                 roleName = name
+            } else {
+                logger.debug(`No grouping - using definition name: ${roleName}`)
             }
             pushToGroupMap(entitlementMap, roleName, entitlement)
         }
 
         // ─── Phase 2: For each group in this definition, build role properties ───
-        // In delete mode, skip expensive operations (lookups, property building)
-        if (!deleteStaleRoles) {
-            // Fetch existing roles once (globally across all definitions) using Search API
-            // Returns only essential fields to minimize memory usage
-            if (!existingRolesFetched && allEntitlementIds.size > 0) {
-                logger.debug(`Pre-fetching existing roles via Search API (${allEntitlementIds.size} entitlement IDs)`)
-                const searchResults = await isc.searchRolesByEntitlements(Array.from(allEntitlementIds))
-                for (const roleDoc of searchResults) {
-                    existingRoleMap.set(roleDoc.name, roleDoc)
-                }
-                existingRolesFetched = true
+        // In delete mode, we still need to track expected role names, but skip expensive property building
+        
+        groups: for (const groupName of entitlementMap.keys()) {
+            logger.debug(`Processing group: ${groupName}`)
+            
+            // In delete mode, just track the name to know which roles to delete
+            if (deleteStaleRoles) {
+                logger.debug(`[DELETE MODE] Tracking role name for deletion: ${groupName}`)
+                roleMap.set(groupName, {} as RoleProperties)
+                continue groups
             }
+            
+            // Create/update mode: build full role properties
+            const ownerId = source.owner!.id!
 
-            groups: for (const groupName of entitlementMap.keys()) {
-                logger.debug(`Processing group: ${groupName}`)
-                const ownerId = source.owner!.id!
+            for (const entitlement of entitlementMap.get(groupName)!) {
+                logger.debug(`Processing entitlement in group: ${entitlement.name}`)
+                const entitlementRef = entitlementToRef(entitlement)
 
-                for (const entitlement of entitlementMap.get(groupName)!) {
-                    logger.debug(`Processing entitlement in group: ${entitlement.name}`)
-                    const entitlementRef = entitlementToRef(entitlement)
-
-                    logger.debug(`Preparing role: ${groupName}`)
-                    let roleProperties: RoleProperties
-                    if (roleMap.has(groupName)) {
-                        roleProperties = roleMap.get(groupName)!
-                        roleProperties.entitlements.push(entitlementRef)
-                    } else {
-                        const existingRole = existingRoleMap.get(groupName)
-                        roleProperties = {
-                            ownerId,
-                            entitlements: [entitlementRef],
-                            requestable: definition.requestable,
-                        }
-                        if (definition.approverType) {
-                            roleProperties.accessRequestConfig = buildApprovalSchemesConfig(
-                                definition.approverType
-                            ) as RequestabilityForRoleV2025
-                        }
-
-                        if (definition.assignmentDefinition) {
-                            const assignmentDefinition = buildName(entitlement, definition.assignmentDefinition)
-                            const membership = await stringToMembership(assignmentDefinition, sources)
-                            roleProperties.membership = membership
-                        }
-
-                        if (existingRole) {
-                            roleProperties.id = existingRole.id
-                        }
-                        roleMap.set(groupName, roleProperties)
+                logger.debug(`Preparing role: ${groupName}`)
+                let roleProperties: RoleProperties
+                if (roleMap.has(groupName)) {
+                    roleProperties = roleMap.get(groupName)!
+                    roleProperties.entitlements.push(entitlementRef)
+                } else {
+                    const existingRole = existingRoleMap.get(groupName)
+                    roleProperties = {
+                        ownerId,
+                        entitlements: [entitlementRef],
+                        requestable: definition.requestable,
                     }
+                    if (definition.approverType) {
+                        roleProperties.accessRequestConfig = buildApprovalSchemesConfig(
+                            definition.approverType
+                        ) as RequestabilityForRoleV2025
+                    }
+
+                    if (definition.assignmentDefinition) {
+                        const assignmentDefinition = buildName(entitlement, definition.assignmentDefinition)
+                        const membership = await stringToMembership(assignmentDefinition, sources)
+                        roleProperties.membership = membership
+                    }
+
+                    if (existingRole) {
+                        roleProperties.id = existingRole.id
+                    }
+                    roleMap.set(groupName, roleProperties)
                 }
             }
         }
@@ -143,56 +142,56 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
     // ─── Phase 3: Create or update roles in ISC (with concurrency) ───
     // Skip when delete option is enabled: no creations or updates, only deletions
     if (!deleteStaleRoles) {
-    await runWithConcurrency(Array.from(roleMap.entries()), API_CONCURRENCY, async ([roleName, role]) => {
-        const { id, ownerId, entitlements, requestable, accessRequestConfig, membership } = role
+        await runWithConcurrency(Array.from(roleMap.entries()), API_CONCURRENCY, async ([roleName, role]) => {
+            const { id, ownerId, entitlements, requestable, accessRequestConfig, membership } = role
 
-        if (id) {
-            const existingRole = existingRoleMap.get(roleName)
-            if (!existingRole) {
-                logger.warn(`Role ${roleName} has id but no cached existing role, skipping update`)
-                return
-            }
-            logger.debug(`Evaluating existing role for update: ${roleName}`)
-            const changes = detectRequestableAndConfigChanges(
-                existingRole,
-                entitlements,
-                requestable,
-                accessRequestConfig,
-                membership
-            )
-            if (shouldSkipUpdate(changes, true)) {
-                logger.debug(`No changes detected for role ${roleName}, skipping update`)
-                return
-            }
-            const roleUpdate = buildEntitlementPatch(entitlements, {
-                requestable,
-                accessRequestConfig,
-                membership,
-            })
-            try {
-                logger.debug(`Updating existing role: ${roleName}`)
-                const rolePayload = await isc.updateRole(id, roleUpdate)
-                role.id = rolePayload.id!
-            } catch (error) {
-                logger.error(`Error updating role: ${error}`)
-            }
-        } else {
-            logger.debug(`Creating new role: ${roleName}`)
-            try {
-                const rolePayload = await isc.createRole(
-                    roleName,
-                    ownerId,
+            if (id) {
+                const existingRole = existingRoleMap.get(roleName)
+                if (!existingRole) {
+                    logger.warn(`Role ${roleName} has id but no cached existing role, skipping update`)
+                    return
+                }
+                logger.debug(`Evaluating existing role for update: ${roleName}`)
+                const changes = detectRequestableAndConfigChanges(
+                    existingRole,
                     entitlements,
                     requestable,
                     accessRequestConfig,
                     membership
                 )
-                role.id = rolePayload.id!
-            } catch (error) {
-                logger.error(`Error creating role: ${error}`)
+                if (shouldSkipUpdate(changes, true)) {
+                    logger.debug(`No changes detected for role ${roleName}, skipping update`)
+                    return
+                }
+                const roleUpdate = buildEntitlementPatch(entitlements, {
+                    requestable,
+                    accessRequestConfig,
+                    membership,
+                })
+                try {
+                    logger.debug(`Updating existing role: ${roleName}`)
+                    const rolePayload = await isc.updateRole(id, roleUpdate)
+                    role.id = rolePayload.id!
+                } catch (error) {
+                    logger.error(`Error updating role: ${error}`)
+                }
+            } else {
+                logger.debug(`Creating new role: ${roleName}`)
+                try {
+                    const rolePayload = await isc.createRole(
+                        roleName,
+                        ownerId,
+                        entitlements,
+                        requestable,
+                        accessRequestConfig,
+                        membership
+                    )
+                    role.id = rolePayload.id!
+                } catch (error) {
+                    logger.error(`Error creating role: ${error}`)
+                }
             }
-        }
-    })
+        })
     }
 
     // ─── Phase 4: Delete stale roles (when toggle enabled) with concurrency ───
@@ -203,27 +202,49 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
         return
     }
 
-    // Use pre-fetched existing roles (already searched in Phase 1/2)
-    // If not fetched yet (delete-only mode), fetch now
-    if (existingRoleMap.size === 0 && allEntitlementIds.size > 0) {
-        logger.debug(`Fetching existing roles for delete via Search API (${allEntitlementIds.size} entitlement IDs)`)
+    const currentRoleNames = new Set(roleMap.keys())
+    logger.debug(`[DELETE MODE] All role names tracked in roleMap: ${Array.from(currentRoleNames).join(', ')}`)
+    
+    if (currentRoleNames.size === 0) {
+        logger.debug('No role names produced by definitions, skipping deletion')
+        return
+    }
+
+    // Fetch existing roles: first try Search API by entitlements, fallback to search by name
+    if (allEntitlementIds.size > 0) {
+        logger.debug(`Fetching existing roles via Search API (${allEntitlementIds.size} entitlement IDs)`)
         const searchResults = await isc.searchRolesByEntitlements(Array.from(allEntitlementIds))
-        for (const roleDoc of searchResults) {
-            existingRoleMap.set(roleDoc.name, roleDoc)
+        logger.debug(`Search API returned ${searchResults.length} existing roles`)
+        for (const role of searchResults) {
+            if (role.name) {
+                existingRoleMap.set(role.name, role)
+            }
+        }
+        
+        // Fallback: if Search API returned nothing, search by name using dedicated API
+        if (searchResults.length === 0) {
+            logger.debug('Search API returned 0 results, falling back to search by name')
+            const nameSearchResults = await isc.searchRolesByNames(Array.from(currentRoleNames))
+            for (const role of nameSearchResults) {
+                if (role.name) {
+                    existingRoleMap.set(role.name, role)
+                }
+            }
         }
     }
 
-    const currentRoleNames = new Set(roleMap.keys())
-    
+    logger.debug(`Expected role names for deletion: ${Array.from(currentRoleNames).join(', ')}`)
+    logger.debug(`Existing role names from search: ${Array.from(existingRoleMap.keys()).join(', ')}`)
+
     // Filter to only roles whose names match those produced by our definitions
     const rolesToDelete = Array.from(existingRoleMap.values()).filter(
         (role) => role.id && role.name && currentRoleNames.has(role.name)
     )
-    
-    logger.debug(`Delete run: found ${existingRoleMap.size} existing roles, ${rolesToDelete.length} previously created to delete`)
+
+    logger.debug(`Delete run: found ${existingRoleMap.size} existing roles, ${currentRoleNames.size} expected role names, ${rolesToDelete.length} roles to delete`)
     await runWithConcurrency(rolesToDelete, API_CONCURRENCY, async (role) => {
         try {
-            logger.info(`Deleting previously created role: ${role.name}`)
+            logger.info(`Deleting role: ${role.name}`)
             await isc.deleteRole(role.id!)
         } catch (error) {
             logger.error(`Error deleting role ${role.name}: ${error}`)

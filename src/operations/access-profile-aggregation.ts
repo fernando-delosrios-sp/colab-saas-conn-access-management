@@ -1,6 +1,5 @@
 import { logger } from '@sailpoint/connector-sdk'
 import {
-    AccessProfileV2025,
     EntitlementV2025,
     JsonPatchOperationV2025,
     RequestabilityV2025,
@@ -96,7 +95,7 @@ async function processAccessProfiles(
     // Cache sources (to get owner IDs) - fetch in parallel
     const sourceCache = new Map<string, SourceAppV2025>()
     const uniqueSourceIds = new Set(accessProfiles.map(ap => ap.sourceId))
-    
+
     const sourceResults = await Promise.allSettled(
         Array.from(uniqueSourceIds).map(async (sourceId) => {
             const source = await isc.getSource(sourceId)
@@ -119,15 +118,24 @@ async function processAccessProfiles(
 
     // Search for existing access profiles
     const entitlementIds = new Set<string>()
+    const apNames = new Set<string>()
     for (const ap of accessProfiles) {
+        apNames.add(ap.name)
         for (const ent of ap.entitlements) {
             if (ent.id) entitlementIds.add(ent.id)
         }
     }
 
-    const existingAps = entitlementIds.size > 0
+    let existingAps = entitlementIds.size > 0
         ? await isc.searchAccessProfilesByEntitlements(Array.from(entitlementIds))
         : []
+    
+    // Fallback: if Search API returned nothing, search by name using dedicated API
+    if (existingAps.length === 0 && apNames.size > 0) {
+        logger.debug('Search API returned 0 results, falling back to search by name')
+        existingAps = await isc.searchAccessProfilesByNames(Array.from(apNames))
+    }
+    
     const existingApMap = new Map(existingAps.map(ap => [ap.name, ap]))
 
     logger.debug(`Found ${existingAps.length} existing access profiles`)
@@ -139,7 +147,7 @@ async function processAccessProfiles(
             const existingAp = existingApMap.get(apData.name)
             const entitlementRefs = apData.entitlements.map(entitlementToRef)
             const source = sourceCache.get(apData.sourceId)
-            
+
             if (!source) {
                 logger.error(`Source ${apData.sourceId} not found in cache, skipping AP ${apData.name}`)
                 return { name: apData.name, id: undefined }
@@ -224,12 +232,12 @@ async function processApplications(
 ): Promise<void> {
     // Group access profiles into applications
     const applications = groupAccessProfilesIntoApplications(accessProfiles, definition)
-    
+
     if (applications.length === 0) {
         logger.warn(`No applications to process for definition ${definition.name}`)
         return
     }
-    
+
     logger.info(`Processing ${applications.length} applications`)
 
     // Search for existing apps
@@ -385,15 +393,22 @@ async function deleteAccessProfilesAndApps(
     logger.info(`Expected: ${expectedApNames.size} access profiles, ${expectedAppNames.size} apps`)
 
     // Step 2: Find existing access profiles and apps
-    const existingAps = entitlementIds.size > 0
+    let existingAps = entitlementIds.size > 0
         ? await isc.searchAccessProfilesByEntitlements(Array.from(entitlementIds))
         : []
+    
+    // Fallback: if Search API returned nothing, search by name using dedicated API
+    if (existingAps.length === 0 && expectedApNames.size > 0) {
+        logger.debug('Search API returned 0 results, falling back to search by name')
+        existingAps = await isc.searchAccessProfilesByNames(Array.from(expectedApNames))
+    }
+    
     const existingApps = sourceIds.size > 0
         ? await isc.listAppsBySources(Array.from(sourceIds))
         : []
 
     logger.info(`Existing: ${existingAps.length} access profiles, ${existingApps.length} apps`)
-    
+
     // Log details about the apps we found
     if (existingApps.length > 0) {
         for (const app of existingApps) {
@@ -410,9 +425,9 @@ async function deleteAccessProfilesAndApps(
 
     // Step 3: Get access profiles for each application using the dedicated API
     logger.debug('Fetching access profiles for each application')
-    
+
     type AppWithAccessProfiles = SourceAppV2025 & { accessProfileIds: string[] }
-    
+
     const appsWithAccessProfiles = await runWithConcurrency(existingApps, API_CONCURRENCY, async (app): Promise<AppWithAccessProfiles | null> => {
         try {
             if (!app.id) {
@@ -434,7 +449,7 @@ async function deleteAccessProfilesAndApps(
 
     const validApps = appsWithAccessProfiles.filter((app): app is AppWithAccessProfiles => app !== null)
     logger.info(`Successfully fetched access profile details for ${validApps.length} apps`)
-    
+
     // Step 4: Remove access profiles from ALL applications that reference them
     const appsToUpdate = validApps.filter(app => {
         if (!app.accessProfileIds || app.accessProfileIds.length === 0) return false
@@ -470,12 +485,12 @@ async function deleteAccessProfilesAndApps(
     // (from the same sources), regardless of the createApplication setting
     const appsToDeleteByName = existingApps.filter(app => {
         if (!app.name || !app.id) return false
-        
+
         // If createApplication is true and we have expected names, only delete those
         if (definition.createApplication && expectedAppNames.size > 0) {
             return expectedAppNames.has(app.name)
         }
-        
+
         // Otherwise, in delete mode, we should delete apps that match the definition name
         // (this catches apps that were created when createApplication was true, but now it's false)
         return app.name === definition.name
@@ -565,7 +580,7 @@ async function buildAccessProfilesFromEntitlements(
         // Validate all entitlements have the same source (critical check)
         const firstSourceId = ents[0].source!.id!
         const mixedSources = ents.some(e => e.source?.id !== firstSourceId)
-        
+
         if (mixedSources) {
             const sourceIds = Array.from(new Set(ents.map(e => e.source?.id).filter(Boolean)))
             logger.error(
@@ -662,7 +677,7 @@ function validateSourceConsistency(
 ): void {
     // Get unique source IDs
     const sourceIds = new Set(accessProfiles.map(ap => ap.sourceId))
-    
+
     if (sourceIds.size <= 1) {
         // Single source or no APs - no validation needed
         return

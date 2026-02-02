@@ -356,8 +356,6 @@
                                             "key": "groupEntitlements",
                                             "label": "Group entitlements by expression?",
                                             "type": "toggle",
-                                            "parentKey": "deleteStaleRoles",
-                                            "parentValue": "false",
                                             "helpKey": "ENABLED: Create multiple roles by grouping entitlements with the same entitlementExpression result (many:1 mapping). DISABLED: Create one role containing all selected entitlements (all:1 mapping, role named by definition name)."
                                         },
                                         {

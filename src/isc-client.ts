@@ -452,12 +452,14 @@ export class ISCClient {
         for (let i = 0; i < entitlementIds.length; i += BATCH_SIZE) {
             const batch = entitlementIds.slice(i, i + BATCH_SIZE)
             const query = batch.map((id) => `@entitlements(id:${id})`).join(' OR ')
+            console.log(`[DEBUG] Role search query batch ${i / BATCH_SIZE + 1}: ${query}`)
             const searchRequest: SearchV2025 = {
                 indices: ['roles' as any],
                 query: { query } as any,
             }
             const response = await api.searchPost({ searchV2025: searchRequest })
             const roles = response.data as any[]
+            console.log(`[DEBUG] Role search batch ${i / BATCH_SIZE + 1} returned ${roles.length} roles${roles.length > 0 ? ': ' + roles.map((r: any) => r.name).join(', ') : ''}`)
             
             // Extract only essential fields to reduce memory footprint
             for (const role of roles) {
@@ -473,6 +475,74 @@ export class ISCClient {
                 }
             }
         }
+        return results
+    }
+
+    /**
+     * Fallback: Search for access profiles by exact name matches using the dedicated API.
+     * Used when Search API returns no results (e.g., for special sources).
+     * @param names Array of exact access profile names to search for
+     * @returns Lightweight access profiles matching the given names
+     */
+    async searchAccessProfilesByNames(names: string[]): Promise<LightweightAccessProfile[]> {
+        if (names.length === 0) return []
+        console.log(`[DEBUG] Fallback: Searching access profiles by name (${names.length} names)`)
+        const api = new AccessProfilesV2025Api(this.config)
+        const results: LightweightAccessProfile[] = []
+        
+        // Fetch all access profiles and filter by name (API doesn't support name filters directly)
+        const response = await Paginator.paginate(api, api.listAccessProfiles as any, {})
+        const allAccessProfiles = response.data as any[]
+        
+        for (const accessProfile of allAccessProfiles) {
+            if (accessProfile.name && names.includes(accessProfile.name)) {
+                results.push({
+                    id: accessProfile.id!,
+                    name: accessProfile.name,
+                    entitlements: accessProfile.entitlements,
+                    requestable: accessProfile.requestable,
+                    accessRequestConfig: accessProfile.accessRequestConfig,
+                    app: accessProfile.app ? {
+                        id: accessProfile.app.id,
+                        name: accessProfile.app.name,
+                        accountSource: accessProfile.app.accountSource,
+                    } : undefined,
+                })
+            }
+        }
+        console.log(`[DEBUG] Fallback: Found ${results.length} access profiles by name: ${results.map(ap => ap.name).join(', ')}`)
+        return results
+    }
+
+    /**
+     * Fallback: Search for roles by exact name matches using the dedicated API.
+     * Used when Search API returns no results (e.g., for special sources).
+     * @param names Array of exact role names to search for
+     * @returns Lightweight roles matching the given names
+     */
+    async searchRolesByNames(names: string[]): Promise<LightweightRole[]> {
+        if (names.length === 0) return []
+        console.log(`[DEBUG] Fallback: Searching roles by name (${names.length} names)`)
+        const api = new RolesV2025Api(this.config)
+        const results: LightweightRole[] = []
+        
+        // Fetch all roles and filter by name (API doesn't support name filters directly)
+        const response = await Paginator.paginate(api, api.listRoles as any, {})
+        const allRoles = response.data as RoleV2025[]
+        
+        for (const role of allRoles) {
+            if (role.name && names.includes(role.name)) {
+                results.push({
+                    id: role.id!,
+                    name: role.name,
+                    entitlements: role.entitlements,
+                    requestable: role.requestable,
+                    accessRequestConfig: role.accessRequestConfig,
+                    membership: role.membership,
+                })
+            }
+        }
+        console.log(`[DEBUG] Fallback: Found ${results.length} roles by name: ${results.map(r => r.name).join(', ')}`)
         return results
     }
 }
