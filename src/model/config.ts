@@ -41,7 +41,6 @@ export interface RoleDefinition extends Definition {
     automaticAssignment: boolean
     assignmentDefinition?: string
     groupEntitlements: boolean
-    roleExpression?: string
     /** When true, delete roles that are no longer produced by any definition. */
     deleteStaleRoles?: boolean
 }

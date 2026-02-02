@@ -8,8 +8,10 @@ import {
     runWithConcurrency,
 } from '../utils'
 
+// Limit concurrent API calls to avoid overwhelming the API
 const API_CONCURRENCY = 8
 
+// ISC API limit for bulk entitlement updates
 const BULK_UPDATE_CHUNK_SIZE = 50
 
 /**
@@ -104,8 +106,8 @@ export async function aggregateEntitlements(config: Config, isc: ISCClient): Pro
                     )
                     await isc.updateEntitlementsInBulk(chunks[i], jsonPatch)
                 } catch (error) {
-                    logger.error(`Error bulk updating entitlements for definition ${definition.name}: ${error}`)
-                    break
+                    logger.error(`Error bulk updating entitlements chunk ${i + 1}/${chunks.length} for definition ${definition.name}: ${error}`)
+                    // Continue with remaining chunks instead of breaking
                 }
             }
         }

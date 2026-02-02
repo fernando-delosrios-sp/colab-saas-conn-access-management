@@ -12,11 +12,14 @@ import {
     evaluateVelocityTemplate as evaluateVelocityExpression,
     pushToGroupMap,
     runWithConcurrency,
+    searchWithFallback,
     shouldSkipUpdate,
 } from '../utils'
 
-const API_CONCURRENCY = 8
 import { stringToMembership } from '../utils/membership-parser'
+
+// Limit concurrent API calls to avoid overwhelming the API
+const API_CONCURRENCY = 8
 
 /**
  * Aggregates roles from entitlements in ISC (Identity Security Cloud).
@@ -33,13 +36,12 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
     const entitlementMap = new Map<string, EntitlementV2025[]>()
     const existingRoleMap = new Map<string, LightweightRole>()
     const allEntitlementIds = new Set<string>()
-    let existingRolesFetched = false
 
     // Find the connector's source (needed for ownerId)
     const sources = await isc.listSources()
     const source = sources.find(
         (x) => (x.connectorAttributes as any).spConnectorInstanceId === config.spConnectorInstanceId
-    )!
+    )
 
     if (!source) {
         const error = `Unable to find source with spConnectorInstanceId "${config.spConnectorInstanceId}"`
@@ -62,7 +64,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             if (ent.id) allEntitlementIds.add(ent.id)
         }
 
-        // Evaluate entitlementExpression; group by role name (definition name or attribute value)
+        // Evaluate entitlementExpression; group by role name (definition name or expression result)
         entitlements: for (const entitlement of entitlements) {
             logger.debug(`Processing entitlement: ${entitlement.name} (${entitlement.id})`)
             const context = { entitlement } as Record<string, unknown>
@@ -78,7 +80,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
             if (definition.groupEntitlements) {
                 // Each unique expression result becomes a separate role
-                logger.debug(`Grouping by attribute ${definition.entitlementExpression} with value ${name}`)
+                logger.debug(`Grouping by expression result: ${name}`)
                 roleName = name
             } else {
                 logger.debug(`No grouping - using definition name: ${roleName}`)
@@ -210,26 +212,18 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
         return
     }
 
-    // Fetch existing roles: first try Search API by entitlements, fallback to search by name
-    if (allEntitlementIds.size > 0) {
-        logger.debug(`Fetching existing roles via Search API (${allEntitlementIds.size} entitlement IDs)`)
-        const searchResults = await isc.searchRolesByEntitlements(Array.from(allEntitlementIds))
-        logger.debug(`Search API returned ${searchResults.length} existing roles`)
-        for (const role of searchResults) {
-            if (role.name) {
-                existingRoleMap.set(role.name, role)
-            }
-        }
-        
-        // Fallback: if Search API returned nothing, search by name using dedicated API
-        if (searchResults.length === 0) {
-            logger.debug('Search API returned 0 results, falling back to search by name')
-            const nameSearchResults = await isc.searchRolesByNames(Array.from(currentRoleNames))
-            for (const role of nameSearchResults) {
-                if (role.name) {
-                    existingRoleMap.set(role.name, role)
-                }
-            }
+    // Fetch existing roles using search with automatic fallback
+    const searchResults = await searchWithFallback({
+        entitlementIds: Array.from(allEntitlementIds),
+        names: Array.from(currentRoleNames),
+        searchByEntitlements: (ids) => isc.searchRolesByEntitlements(ids),
+        searchByNames: (names) => isc.searchRolesByNames(names),
+        entityType: 'roles',
+    })
+    
+    for (const role of searchResults) {
+        if (role.name) {
+            existingRoleMap.set(role.name, role)
         }
     }
 

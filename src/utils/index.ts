@@ -2,18 +2,12 @@ import { EntitlementRefV2025, EntitlementV2025 } from 'sailpoint-api-client'
 import { stringToMembership } from './membership-parser'
 import { evaluateVelocityTemplate } from './velocity'
 
-// export const normalizeAttributes = (entitlement: EntitlementV2025, _group: string | undefined): EntitlementV2025 => {
-//     const attributes = {
-//         ...entitlement.attributes,
-//         name: entitlement.name,
-//         value: entitlement.value,
-//         _source: entitlement.source?.name,
-//         _group,
-//     }
-
-//     return { ...entitlement, attributes }
-// }
-
+/**
+ * Evaluates a Velocity template using entitlement attributes as context.
+ * @param entitlement - The entitlement whose attributes will be used as template context
+ * @param template - The Velocity template string to evaluate
+ * @returns The rendered template string
+ */
 export const buildName = (entitlement: EntitlementV2025, template: string): string => {
     return evaluateVelocityTemplate(template, entitlement.attributes as Record<string, unknown>)
 }
@@ -46,3 +40,5 @@ export {
 } from './aggregation'
 export type { EntitlementPatchOptions, ChangeDetectionResult } from './aggregation'
 export { runWithConcurrency } from './concurrency'
+export { searchWithFallback } from './search-fallback'
+export type { SearchFallbackOptions } from './search-fallback'

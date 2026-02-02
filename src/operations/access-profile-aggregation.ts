@@ -15,9 +15,11 @@ import {
     entitlementToRef,
     evaluateVelocityTemplate as evaluateVelocityExpression,
     runWithConcurrency,
+    searchWithFallback,
     shouldSkipUpdate,
 } from '../utils'
 
+// Limit concurrent API calls to avoid overwhelming the API
 const API_CONCURRENCY = 8
 
 interface AccessProfileData {
@@ -126,15 +128,13 @@ async function processAccessProfiles(
         }
     }
 
-    let existingAps = entitlementIds.size > 0
-        ? await isc.searchAccessProfilesByEntitlements(Array.from(entitlementIds))
-        : []
-    
-    // Fallback: if Search API returned nothing, search by name using dedicated API
-    if (existingAps.length === 0 && apNames.size > 0) {
-        logger.debug('Search API returned 0 results, falling back to search by name')
-        existingAps = await isc.searchAccessProfilesByNames(Array.from(apNames))
-    }
+    const existingAps = await searchWithFallback({
+        entitlementIds: Array.from(entitlementIds),
+        names: Array.from(apNames),
+        searchByEntitlements: (ids) => isc.searchAccessProfilesByEntitlements(ids),
+        searchByNames: (names) => isc.searchAccessProfilesByNames(names),
+        entityType: 'access profiles',
+    })
     
     const existingApMap = new Map(existingAps.map(ap => [ap.name, ap]))
 
@@ -295,17 +295,18 @@ async function processApplications(
             { op: 'replace', path: '/matchAllAccounts', value: false },
         ]
 
-        // Check if update is needed
+        // Check if boolean settings changed (skip expensive access profile comparison)
+        // Note: We always update access profiles since checking current state requires an additional API call
         if (existingApp) {
-            const accessProfilesChanged = !areStringArraysEqual((existingApp as any).accessProfiles || [], apIdsForApp)
             const enabledChanged = existingApp.enabled !== true
             const appCenterEnabledChanged = existingApp.appCenterEnabled !== true
             const provisionRequestEnabledChanged = existingApp.provisionRequestEnabled !== true
             const matchAllAccountsChanged = existingApp.matchAllAccounts !== false
 
-            if (!accessProfilesChanged && !enabledChanged && !appCenterEnabledChanged && !provisionRequestEnabledChanged && !matchAllAccountsChanged) {
-                logger.debug(`No changes for app ${appData.name}, skipping update`)
-                continue
+            // If only boolean flags are unchanged, still update to ensure access profiles are current
+            // This is acceptable since we're updating in batches sequentially
+            if (!enabledChanged && !appCenterEnabledChanged && !provisionRequestEnabledChanged && !matchAllAccountsChanged) {
+                logger.debug(`Boolean flags unchanged for app ${appData.name}, but updating access profiles anyway`)
             }
         }
 
@@ -393,15 +394,13 @@ async function deleteAccessProfilesAndApps(
     logger.info(`Expected: ${expectedApNames.size} access profiles, ${expectedAppNames.size} apps`)
 
     // Step 2: Find existing access profiles and apps
-    let existingAps = entitlementIds.size > 0
-        ? await isc.searchAccessProfilesByEntitlements(Array.from(entitlementIds))
-        : []
-    
-    // Fallback: if Search API returned nothing, search by name using dedicated API
-    if (existingAps.length === 0 && expectedApNames.size > 0) {
-        logger.debug('Search API returned 0 results, falling back to search by name')
-        existingAps = await isc.searchAccessProfilesByNames(Array.from(expectedApNames))
-    }
+    const existingAps = await searchWithFallback({
+        entitlementIds: Array.from(entitlementIds),
+        names: Array.from(expectedApNames),
+        searchByEntitlements: (ids) => isc.searchAccessProfilesByEntitlements(ids),
+        searchByNames: (names) => isc.searchAccessProfilesByNames(names),
+        entityType: 'access profiles',
+    })
     
     const existingApps = sourceIds.size > 0
         ? await isc.listAppsBySources(Array.from(sourceIds))
