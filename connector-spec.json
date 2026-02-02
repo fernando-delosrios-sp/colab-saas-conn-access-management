@@ -329,19 +329,41 @@
     },
     "entitlementSchemas": [
         {
-            "type": "group",
+            "type": "accessProfile",
             "identityAttribute": "id",
             "displayAttribute": "name",
             "attributes": [
                 {
                     "name": "id",
                     "type": "string",
-                    "description": "Account type ID"
+                    "description": "ID"
                 },
                 {
                     "name": "name",
                     "type": "string",
-                    "description": "Account type name"
+                    "description": "Name"
+                },
+                {
+                    "name": "description",
+                    "type": "string",
+                    "description": "Description"
+                }
+            ]
+        },
+        {
+            "type": "role",
+            "identityAttribute": "id",
+            "displayAttribute": "name",
+            "attributes": [
+                {
+                    "name": "id",
+                    "type": "string",
+                    "description": "ID"
+                },
+                {
+                    "name": "name",
+                    "type": "string",
+                    "description": "Name"
                 },
                 {
                     "name": "description",
