@@ -1,26 +1,21 @@
 import { EntitlementRefV2025, EntitlementV2025 } from 'sailpoint-api-client'
-import velocityjs from 'velocityjs'
 import { stringToMembership } from './membership-parser'
+import { evaluateVelocityTemplate } from './velocity'
 
-export const normalizeAttributes = (entitlement: EntitlementV2025, _group: string | undefined): EntitlementV2025 => {
-    const attributes = {
-        ...entitlement.attributes,
-        name: entitlement.name,
-        value: entitlement.value,
-        _source: entitlement.source?.name,
-        _group,
-    }
+// export const normalizeAttributes = (entitlement: EntitlementV2025, _group: string | undefined): EntitlementV2025 => {
+//     const attributes = {
+//         ...entitlement.attributes,
+//         name: entitlement.name,
+//         value: entitlement.value,
+//         _source: entitlement.source?.name,
+//         _group,
+//     }
 
-    return { ...entitlement, attributes }
-}
+//     return { ...entitlement, attributes }
+// }
 
 export const buildName = (entitlement: EntitlementV2025, template: string): string => {
-    const velocityTemplate = velocityjs.parse(template)
-
-    const velocity = new velocityjs.Compile(velocityTemplate)
-    const name = velocity.render(entitlement.attributes)
-
-    return name
+    return evaluateVelocityTemplate(template, entitlement.attributes as Record<string, unknown>)
 }
 
 export const entitlementToRef = (entitlement: EntitlementV2025): EntitlementRefV2025 => {
@@ -38,23 +33,16 @@ export const areStringArraysEqual = (a?: string[], b?: string[]): boolean => {
     return arrA.every((val, idx) => val === arrB[idx])
 }
 
-export const areEntitlementRefsEqual = (a?: { id?: string | null }[] | null, b?: { id?: string | null }[]): boolean => {
-    const idsA = (a ?? [])
-        .map((x) => x.id ?? undefined)
-        .filter(Boolean)
-        .slice()
-        .sort()
-    const idsB = (b ?? [])
-        .map((x) => x.id ?? undefined)
-        .filter(Boolean)
-        .slice()
-        .sort()
-    if (idsA.length !== idsB.length) return false
-    return idsA.every((val, idx) => val === idsB[idx])
-}
-
-export const areJsonEqual = (a: any, b: any): boolean => {
-    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
-}
-
+export { areEntitlementRefsEqual, areJsonEqual } from './comparison'
 export { stringToMembership }
+export { evaluateVelocityTemplate } from './velocity'
+export {
+    pushToGroupMap,
+    buildApprovalSchemesConfig,
+    buildEntitlementPatch,
+    buildEntitlementRequestConfig,
+    detectRequestableAndConfigChanges,
+    shouldSkipUpdate,
+} from './aggregation'
+export type { EntitlementPatchOptions, ChangeDetectionResult } from './aggregation'
+export { runWithConcurrency } from './concurrency'
