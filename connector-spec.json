@@ -212,8 +212,6 @@
                                             "key": "groupEntitlements",
                                             "label": "Group entitlements into access profiles?",
                                             "type": "toggle",
-                                            "parentKey": "deleteMode",
-                                            "parentValue": "false",
                                             "helpKey": "ENABLED: Multiple entitlements with the same entitlementExpression result are grouped into one access profile (many:1). DISABLED: Each entitlement creates its own access profile (1:1 mapping). When disabled, overlapping entitlements are discarded to prevent duplicates."
                                         },
                                         {
@@ -265,8 +263,6 @@
                                             "key": "createApplication",
                                             "label": "Create application(s)?",
                                             "type": "toggle",
-                                            "parentKey": "deleteMode",
-                                            "parentValue": "false",
                                             "helpKey": "Create ISC applications to group and organize access profiles. Applications provide a higher-level container for related access profiles, making them easier to manage and request."
                                         },
                                         {
@@ -337,7 +333,7 @@
                                         {
                                             "key": "entitlementExpression",
                                             "label": "Entitlement expression",
-                                            "helpKey": "Velocity expression for filtering and/or naming roles. Return empty to exclude entitlement. When groupEntitlements=true, the result becomes the role name and entitlements with the same result are grouped together. Context: $entitlement object or fields like $name, $value. Example: $attribute or ${source.name}_${attribute}",
+                                            "helpKey": "Velocity expression for filtering and/or naming roles. Return empty to exclude entitlement. When groupEntitlements=true, the result becomes the role name and entitlements with the same result are grouped together. Context: $entitlement object.",
                                             "type": "textarea",
                                             "required": true
                                         }
@@ -419,7 +415,7 @@
                                             "required": true,
                                             "parentKey": "automaticAssignment",
                                             "parentValue": "true",
-                                            "helpKey": "Membership criteria for automatic role assignment using Velocity template syntax. Can reference identity attributes and use logical operators. See https://github.com/yannick-beot-sp/vscode-sailpoint-identitynow?tab=readme-ov-file#roles for detailed format and examples. Variables from entitlement context are available."
+                                            "helpKey": "Membership criteria for automatic role assignment using Velocity template syntax. Can reference identity attributes and use logical operators. See https://github.com/yannick-beot-sp/vscode-sailpoint-identitynow?tab=readme-ov-file#roles for detailed format and examples. Context variables: $name (role name). Use $entitlement if not grouping or $entitlements if grouping."
                                         }
                                     ]
                                 }

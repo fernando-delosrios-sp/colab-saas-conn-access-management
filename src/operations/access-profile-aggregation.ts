@@ -8,12 +8,11 @@ import {
 import { ISCClient } from '../isc-client'
 import { AccessProfileDefinition, Config } from '../model/config'
 import {
-    areStringArraysEqual,
     buildApprovalSchemesConfig,
     buildEntitlementPatch,
     detectRequestableAndConfigChanges,
     entitlementToRef,
-    evaluateVelocityTemplate as evaluateVelocityExpression,
+    evaluateVelocityExpression,
     runWithConcurrency,
     searchWithFallback,
     shouldSkipUpdate,
@@ -135,7 +134,7 @@ async function processAccessProfiles(
         searchByNames: (names) => isc.searchAccessProfilesByNames(names),
         entityType: 'access profiles',
     })
-    
+
     const existingApMap = new Map(existingAps.map(ap => [ap.name, ap]))
 
     logger.debug(`Found ${existingAps.length} existing access profiles`)
@@ -253,6 +252,7 @@ async function processApplications(
 
         // Step 1: Create app if needed
         let appId: string
+        let isNewlyCreated = false
         const existingApp = existingAppMap.get(appData.name)
         if (existingApp?.id) {
             appId = existingApp.id
@@ -261,7 +261,13 @@ async function processApplications(
             try {
                 const newApp = await isc.createApp(appData.name, appData.sourceId)
                 appId = newApp.id!
+                isNewlyCreated = true
                 logger.info(`Created application: ${appData.name} (${appId})`)
+                
+                // Wait for the app to be fully ready in ISC before updating it
+                // This prevents race conditions where the app isn't immediately available for updates
+                logger.debug(`Waiting 2 seconds for newly created app ${appData.name} to be ready`)
+                await new Promise(resolve => setTimeout(resolve, 2000))
             } catch (error) {
                 logger.error(`Error creating app ${appData.name}: ${error}`)
                 continue
@@ -401,7 +407,7 @@ async function deleteAccessProfilesAndApps(
         searchByNames: (names) => isc.searchAccessProfilesByNames(names),
         entityType: 'access profiles',
     })
-    
+
     const existingApps = sourceIds.size > 0
         ? await isc.listAppsBySources(Array.from(sourceIds))
         : []

@@ -6,10 +6,9 @@ import { RoleProperties } from '../model/propertyDefinitions'
 import {
     buildApprovalSchemesConfig,
     buildEntitlementPatch,
-    buildName,
     detectRequestableAndConfigChanges,
     entitlementToRef,
-    evaluateVelocityTemplate as evaluateVelocityExpression,
+    evaluateVelocityExpression,
     pushToGroupMap,
     runWithConcurrency,
     searchWithFallback,
@@ -90,54 +89,60 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
         // ─── Phase 2: For each group in this definition, build role properties ───
         // In delete mode, we still need to track expected role names, but skip expensive property building
-        
+
         groups: for (const groupName of entitlementMap.keys()) {
             logger.debug(`Processing group: ${groupName}`)
-            
+
             // In delete mode, just track the name to know which roles to delete
             if (deleteStaleRoles) {
                 logger.debug(`[DELETE MODE] Tracking role name for deletion: ${groupName}`)
                 roleMap.set(groupName, {} as RoleProperties)
                 continue groups
             }
-            
+
             // Create/update mode: build full role properties
             const ownerId = source.owner!.id!
-
-            for (const entitlement of entitlementMap.get(groupName)!) {
-                logger.debug(`Processing entitlement in group: ${entitlement.name}`)
-                const entitlementRef = entitlementToRef(entitlement)
-
-                logger.debug(`Preparing role: ${groupName}`)
-                let roleProperties: RoleProperties
-                if (roleMap.has(groupName)) {
-                    roleProperties = roleMap.get(groupName)!
-                    roleProperties.entitlements.push(entitlementRef)
-                } else {
-                    const existingRole = existingRoleMap.get(groupName)
-                    roleProperties = {
-                        ownerId,
-                        entitlements: [entitlementRef],
-                        requestable: definition.requestable,
-                    }
-                    if (definition.approverType) {
-                        roleProperties.accessRequestConfig = buildApprovalSchemesConfig(
-                            definition.approverType
-                        ) as RequestabilityForRoleV2025
-                    }
-
-                    if (definition.assignmentDefinition) {
-                        const assignmentDefinition = buildName(entitlement, definition.assignmentDefinition)
-                        const membership = await stringToMembership(assignmentDefinition, sources)
-                        roleProperties.membership = membership
-                    }
-
-                    if (existingRole) {
-                        roleProperties.id = existingRole.id
-                    }
-                    roleMap.set(groupName, roleProperties)
-                }
+            const groupEntitlements = entitlementMap.get(groupName)!
+            
+            // Build role properties once per group
+            const existingRole = existingRoleMap.get(groupName)
+            const roleProperties: RoleProperties = {
+                ownerId,
+                entitlements: groupEntitlements.map(entitlementToRef),
+                requestable: definition.requestable,
             }
+            
+            if (definition.approverType) {
+                roleProperties.accessRequestConfig = buildApprovalSchemesConfig(
+                    definition.approverType
+                ) as RequestabilityForRoleV2025
+            }
+
+            // Evaluate assignmentDefinition with proper context
+            if (definition.assignmentDefinition) {
+                const assignmentContext: Record<string, unknown> = { name: groupName }
+                
+                if (definition.groupEntitlements) {
+                    // Multiple entitlements grouped: provide all as 'entitlements'
+                    assignmentContext.entitlements = groupEntitlements
+                } else {
+                    // Single entitlement: provide as 'entitlement'
+                    assignmentContext.entitlement = groupEntitlements[0]
+                }
+                
+                const assignmentDefinition = evaluateVelocityExpression(
+                    definition.assignmentDefinition,
+                    assignmentContext
+                )
+                const membership = await stringToMembership(assignmentDefinition, sources)
+                roleProperties.membership = membership
+            }
+
+            if (existingRole) {
+                roleProperties.id = existingRole.id
+            }
+            
+            roleMap.set(groupName, roleProperties)
         }
     }
 
@@ -206,7 +211,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
     const currentRoleNames = new Set(roleMap.keys())
     logger.debug(`[DELETE MODE] All role names tracked in roleMap: ${Array.from(currentRoleNames).join(', ')}`)
-    
+
     if (currentRoleNames.size === 0) {
         logger.debug('No role names produced by definitions, skipping deletion')
         return
@@ -220,7 +225,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
         searchByNames: (names) => isc.searchRolesByNames(names),
         entityType: 'roles',
     })
-    
+
     for (const role of searchResults) {
         if (role.name) {
             existingRoleMap.set(role.name, role)

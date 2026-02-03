@@ -4,7 +4,7 @@ import { ISCClient } from '../isc-client'
 import { Config } from '../model/config'
 import {
     buildEntitlementRequestConfig,
-    evaluateVelocityTemplate as evaluateVelocityExpression,
+    evaluateVelocityExpression,
     runWithConcurrency,
 } from '../utils'
 

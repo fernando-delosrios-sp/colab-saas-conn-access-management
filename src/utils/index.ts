@@ -1,16 +1,6 @@
 import { EntitlementRefV2025, EntitlementV2025 } from 'sailpoint-api-client'
 import { stringToMembership } from './membership-parser'
-import { evaluateVelocityTemplate } from './velocity'
-
-/**
- * Evaluates a Velocity template using entitlement attributes as context.
- * @param entitlement - The entitlement whose attributes will be used as template context
- * @param template - The Velocity template string to evaluate
- * @returns The rendered template string
- */
-export const buildName = (entitlement: EntitlementV2025, template: string): string => {
-    return evaluateVelocityTemplate(template, entitlement.attributes as Record<string, unknown>)
-}
+import { evaluateVelocityExpression } from './velocity'
 
 export const entitlementToRef = (entitlement: EntitlementV2025): EntitlementRefV2025 => {
     return {
@@ -29,7 +19,7 @@ export const areStringArraysEqual = (a?: string[], b?: string[]): boolean => {
 
 export { areEntitlementRefsEqual, areJsonEqual } from './comparison'
 export { stringToMembership }
-export { evaluateVelocityTemplate } from './velocity'
+export { evaluateVelocityExpression } from './velocity'
 export {
     pushToGroupMap,
     buildApprovalSchemesConfig,

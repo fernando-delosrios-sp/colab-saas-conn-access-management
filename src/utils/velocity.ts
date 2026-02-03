@@ -8,7 +8,7 @@ import velocityjs from 'velocityjs'
  * @returns Rendered string
  * @throws Error if template parsing or rendering fails
  */
-export function evaluateVelocityTemplate(
+export function evaluateVelocityExpression(
     template: string,
     context: Record<string, unknown> = {}
 ): string {
