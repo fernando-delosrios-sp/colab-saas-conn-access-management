@@ -25,23 +25,16 @@ export function pushToGroupMap<K>(
  * Builds the access request config object with approval schemes from approver type.
  */
 export function buildApprovalSchemesConfig(approverType: string): { approvalSchemes: { approverType: string }[] } {
-    return {
-        approvalSchemes: [{ approverType }],
-    }
+    return { approvalSchemes: [{ approverType }] }
 }
 
 /**
  * Builds entitlement request config for PUT /entitlements/:id/entitlement-request-config.
- * Use approverType values: ENTITLEMENT_OWNER, SOURCE_OWNER, MANAGER, GOVERNANCE_GROUP, WORKFLOW.
  */
-export function buildEntitlementRequestConfig(
-    approverType: string
-): EntitlementRequestConfigV2025 {
+export function buildEntitlementRequestConfig(approverType: string): EntitlementRequestConfigV2025 {
     return {
         accessRequestConfig: {
-            approvalSchemes: [
-                { approverType: approverType as EntitlementApprovalSchemeV2025ApproverTypeV2025 },
-            ],
+            approvalSchemes: [{ approverType: approverType as EntitlementApprovalSchemeV2025ApproverTypeV2025 }],
         },
     }
 }
@@ -54,19 +47,17 @@ export interface EntitlementPatchOptions {
 
 /**
  * Builds JSON patch operations for updating entitlements on access profiles/roles.
- * Always includes entitlements array; optionally adds requestable, accessRequestConfig, membership.
  */
 export function buildEntitlementPatch(
     entitlements: { id?: string | null }[],
     options?: EntitlementPatchOptions
 ): JsonPatchOperationV2025[] {
-    const patch: JsonPatchOperationV2025[] = [
-        {
-            op: 'replace',
-            path: '/entitlements',
-            value: entitlements as JsonPatchOperationV2025['value'],
-        },
-    ]
+    const patch: JsonPatchOperationV2025[] = [{
+        op: 'replace',
+        path: '/entitlements',
+        value: entitlements as JsonPatchOperationV2025['value'],
+    }]
+    
     if (options?.requestable) {
         patch.push({ op: 'replace', path: '/requestable', value: true as JsonPatchOperationV2025['value'] })
     }
@@ -96,7 +87,6 @@ export interface ChangeDetectionResult {
 
 /**
  * Compares desired vs existing values to detect if an update is needed.
- * Returns flags for entitlementsChanged, requestableChanged, accessRequestConfigChanged, membershipChanged.
  */
 export function detectRequestableAndConfigChanges(
     existing: { entitlements?: { id?: string | null }[] | null; requestable?: boolean; accessRequestConfig?: unknown; membership?: unknown },
@@ -120,15 +110,17 @@ export function detectRequestableAndConfigChanges(
 
 /**
  * Returns true if no meaningful changes were detected (skip update).
- * When includeMembership is true, membership changes also trigger an update.
  */
 export function shouldSkipUpdate(result: ChangeDetectionResult, includeMembership = false): boolean {
     const { entitlementsChanged, requestableChanged, accessRequestConfigChanged, membershipChanged } = result
+    
     if (entitlementsChanged || requestableChanged || accessRequestConfigChanged) {
         return false
     }
+    
     if (includeMembership && membershipChanged) {
         return false
     }
+    
     return true
 }

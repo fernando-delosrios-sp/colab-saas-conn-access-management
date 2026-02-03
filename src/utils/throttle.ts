@@ -1,5 +1,5 @@
 /**
- * Sliding-window throttle: max 100 requests per 10 seconds (ISC rate limit).
+ * Sliding-window throttle: max 100 requests per 10 seconds.
  */
 const MAX_REQUESTS = 100
 const WINDOW_MS = 10_000
@@ -18,13 +18,13 @@ export async function throttle(): Promise<void> {
             }
 
             if (timestamps.length < MAX_REQUESTS) {
-                timestamps.push(Date.now())
+                timestamps.push(now)
                 return
             }
 
             const waitMs = timestamps[0] + WINDOW_MS - now
             if (waitMs > 0) {
-                await new Promise((resolve) => setTimeout(resolve, waitMs))
+                await new Promise(resolve => setTimeout(resolve, waitMs))
             }
         }
     })

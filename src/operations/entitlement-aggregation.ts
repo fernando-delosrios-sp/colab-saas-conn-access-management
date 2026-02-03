@@ -18,11 +18,11 @@ const BULK_UPDATE_CHUNK_SIZE = 50
  * Chunks an array into smaller arrays of at most `size` elements.
  */
 function chunk<T>(arr: T[], size: number): T[][] {
-    const result: T[][] = []
+    const chunks: T[][] = []
     for (let i = 0; i < arr.length; i += size) {
-        result.push(arr.slice(i, i + size))
+        chunks.push(arr.slice(i, i + size))
     }
-    return result
+    return chunks
 }
 
 /**
@@ -112,7 +112,7 @@ export async function aggregateEntitlements(config: Config, isc: ISCClient): Pro
             }
         }
 
-        // Set entitlement request config (approval) per entitlement when requireApproval + approverType (with concurrency)
+        // Set entitlement request config (approval) per entitlement when requireApproval and approverType are defined
         if (definition.requestable && definition.requireApproval && definition.approverType) {
             const requestConfig = buildEntitlementRequestConfig(definition.approverType)
             const withIds = selected.filter((e): e is EntitlementV2025 & { id: string } => Boolean(e.id))

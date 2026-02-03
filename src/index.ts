@@ -11,14 +11,9 @@ import { Config } from './model/config'
 import { aggregateAccessProfiles, aggregateEntitlements, aggregateRoles } from './operations'
 
 export const PROCESSINGWAIT = 60 * 1000
-
-// Connector must be exported as module property named connector
 export const connector = async () => {
-    // Get connector source config
     const config: Config = await readConfig()
     logger.level = 'debug'
-
-    // Use the vendor SDK, or implement own client as necessary, to initialize a client
     const isc = new ISCClient(config)
 
     const stdTestConnection: StdTestConnectionHandler = async (context, input, res) => {

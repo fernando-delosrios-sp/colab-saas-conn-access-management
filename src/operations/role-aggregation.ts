@@ -13,9 +13,8 @@ import {
     runWithConcurrency,
     searchWithFallback,
     shouldSkipUpdate,
+    stringToMembership,
 } from '../utils'
-
-import { stringToMembership } from '../utils/membership-parser'
 
 // Limit concurrent API calls to avoid overwhelming the API
 const API_CONCURRENCY = 8
@@ -51,7 +50,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
         (d) => d.deleteStaleRoles === true || String(d.deleteStaleRoles) === 'true'
     )
 
-    // ─── Phase 1: Collect entitlements and group them per definition ───
+    // Phase 1: Collect entitlements and group them per definition
     roles: for (const definition of config.roles!) {
         logger.debug(`Processing definition: ${definition.name}`)
         entitlementMap.clear()
@@ -87,15 +86,14 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             pushToGroupMap(entitlementMap, roleName, entitlement)
         }
 
-        // ─── Phase 2: For each group in this definition, build role properties ───
+        // Phase 2: For each group in this definition, build role properties
         // In delete mode, we still need to track expected role names, but skip expensive property building
-
         groups: for (const groupName of entitlementMap.keys()) {
             logger.debug(`Processing group: ${groupName}`)
 
             // In delete mode, just track the name to know which roles to delete
             if (deleteStaleRoles) {
-                logger.debug(`[DELETE MODE] Tracking role name for deletion: ${groupName}`)
+                logger.debug(`Delete mode: tracking role name for deletion: ${groupName}`)
                 roleMap.set(groupName, {} as RoleProperties)
                 continue groups
             }
@@ -104,8 +102,6 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             const ownerId = source.owner!.id!
             const groupEntitlements = entitlementMap.get(groupName)!
             
-            // Build role properties once per group
-            const existingRole = existingRoleMap.get(groupName)
             const roleProperties: RoleProperties = {
                 ownerId,
                 entitlements: groupEntitlements.map(entitlementToRef),
@@ -113,12 +109,10 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             }
             
             if (definition.approverType) {
-                roleProperties.accessRequestConfig = buildApprovalSchemesConfig(
-                    definition.approverType
-                ) as RequestabilityForRoleV2025
+                roleProperties.accessRequestConfig = buildApprovalSchemesConfig(definition.approverType) as RequestabilityForRoleV2025
             }
 
-            // Evaluate assignmentDefinition with proper context
+            // Evaluate membership assignment definition
             if (definition.assignmentDefinition) {
                 const assignmentContext: Record<string, unknown> = { name: groupName }
                 
@@ -130,14 +124,11 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
                     assignmentContext.entitlement = groupEntitlements[0]
                 }
                 
-                const assignmentDefinition = evaluateVelocityExpression(
-                    definition.assignmentDefinition,
-                    assignmentContext
-                )
-                const membership = await stringToMembership(assignmentDefinition, sources)
-                roleProperties.membership = membership
+                const assignmentDefinition = evaluateVelocityExpression(definition.assignmentDefinition, assignmentContext)
+                roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
             }
 
+            const existingRole = existingRoleMap.get(groupName)
             if (existingRole) {
                 roleProperties.id = existingRole.id
             }
@@ -146,7 +137,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
         }
     }
 
-    // ─── Phase 3: Create or update roles in ISC (with concurrency) ───
+    // Phase 3: Create or update roles in ISC (with concurrency)
     // Skip when delete option is enabled: no creations or updates, only deletions
     if (!deleteStaleRoles) {
         await runWithConcurrency(Array.from(roleMap.entries()), API_CONCURRENCY, async ([roleName, role]) => {
@@ -201,7 +192,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
         })
     }
 
-    // ─── Phase 4: Delete stale roles (when toggle enabled) with concurrency ───
+    // Phase 4: Delete stale roles (when toggle enabled) with concurrency
     if (!deleteStaleRoles) return
 
     if (allEntitlementIds.size === 0) {
@@ -210,7 +201,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
     }
 
     const currentRoleNames = new Set(roleMap.keys())
-    logger.debug(`[DELETE MODE] All role names tracked in roleMap: ${Array.from(currentRoleNames).join(', ')}`)
+    logger.debug(`Delete mode: all role names tracked in roleMap: ${Array.from(currentRoleNames).join(', ')}`)
 
     if (currentRoleNames.size === 0) {
         logger.debug('No role names produced by definitions, skipping deletion')

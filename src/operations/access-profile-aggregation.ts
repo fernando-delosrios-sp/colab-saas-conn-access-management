@@ -252,7 +252,6 @@ async function processApplications(
 
         // Step 1: Create app if needed
         let appId: string
-        let isNewlyCreated = false
         const existingApp = existingAppMap.get(appData.name)
         if (existingApp?.id) {
             appId = existingApp.id
@@ -261,11 +260,10 @@ async function processApplications(
             try {
                 const newApp = await isc.createApp(appData.name, appData.sourceId)
                 appId = newApp.id!
-                isNewlyCreated = true
                 logger.info(`Created application: ${appData.name} (${appId})`)
                 
-                // Wait for the app to be fully ready in ISC before updating it
-                // This prevents race conditions where the app isn't immediately available for updates
+                // Wait for the app to be fully ready before updating
+                // This prevents race conditions where the app isn't immediately available
                 logger.debug(`Waiting 2 seconds for newly created app ${appData.name} to be ready`)
                 await new Promise(resolve => setTimeout(resolve, 2000))
             } catch (error) {
@@ -300,21 +298,6 @@ async function processApplications(
             { op: 'replace', path: '/provisionRequestEnabled', value: true },
             { op: 'replace', path: '/matchAllAccounts', value: false },
         ]
-
-        // Check if boolean settings changed (skip expensive access profile comparison)
-        // Note: We always update access profiles since checking current state requires an additional API call
-        if (existingApp) {
-            const enabledChanged = existingApp.enabled !== true
-            const appCenterEnabledChanged = existingApp.appCenterEnabled !== true
-            const provisionRequestEnabledChanged = existingApp.provisionRequestEnabled !== true
-            const matchAllAccountsChanged = existingApp.matchAllAccounts !== false
-
-            // If only boolean flags are unchanged, still update to ensure access profiles are current
-            // This is acceptable since we're updating in batches sequentially
-            if (!enabledChanged && !appCenterEnabledChanged && !provisionRequestEnabledChanged && !matchAllAccountsChanged) {
-                logger.debug(`Boolean flags unchanged for app ${appData.name}, but updating access profiles anyway`)
-            }
-        }
 
         try {
             await isc.updateSourceAccessProfiles(appId, appUpdate)
@@ -374,18 +357,16 @@ async function deleteAccessProfilesAndApps(
 
         expectedApNames.add(apName)
 
-        // Determine expected app name for this AP
         if (definition.createApplication) {
             if (definition.groupAccessProfiles) {
                 if (!definition.applicationExpression) {
-                    logger.error(`Definition ${definition.name}: groupAccessProfiles is true but applicationExpression not defined, skipping app deletion for this access profile`)
+                    logger.error(`Definition ${definition.name}: groupAccessProfiles is true but applicationExpression not defined`)
                     continue
                 }
                 const appContext: Record<string, unknown> = { name: apName }
+                appContext.entitlement = definition.groupEntitlements ? ents : ents[0]
                 if (definition.groupEntitlements) {
                     appContext.entitlements = ents
-                } else {
-                    appContext.entitlement = ents[0]
                 }
                 const appName = evaluateVelocityExpression(definition.applicationExpression, appContext)
                 if (appName && appName !== definition.applicationExpression) {
@@ -414,13 +395,6 @@ async function deleteAccessProfilesAndApps(
 
     logger.info(`Existing: ${existingAps.length} access profiles, ${existingApps.length} apps`)
 
-    // Log details about the apps we found
-    if (existingApps.length > 0) {
-        for (const app of existingApps) {
-            logger.debug(`Found app: ${app.name} (ID: ${app.id})`)
-        }
-    }
-
     // Determine which access profiles will be deleted
     const apsToDelete = existingAps.filter(ap => ap.name && expectedApNames.has(ap.name) && ap.id)
     const apIdsToDelete = new Set(apsToDelete.map(ap => ap.id!))
@@ -428,7 +402,7 @@ async function deleteAccessProfilesAndApps(
     logger.info(`Will delete ${apsToDelete.length} access profiles`)
     logger.debug(`Access profile IDs to delete: ${Array.from(apIdsToDelete).join(', ')}`)
 
-    // Step 3: Get access profiles for each application using the dedicated API
+    // Step 3: Get access profiles for each application
     logger.debug('Fetching access profiles for each application')
 
     type AppWithAccessProfiles = SourceAppV2025 & { accessProfileIds: string[] }
@@ -455,15 +429,10 @@ async function deleteAccessProfilesAndApps(
     const validApps = appsWithAccessProfiles.filter((app): app is AppWithAccessProfiles => app !== null)
     logger.info(`Successfully fetched access profile details for ${validApps.length} apps`)
 
-    // Step 4: Remove access profiles from ALL applications that reference them
+    // Step 4: Remove access profiles from applications that reference them
     const appsToUpdate = validApps.filter(app => {
         if (!app.accessProfileIds || app.accessProfileIds.length === 0) return false
-        // Check if this app has any of the access profiles we're about to delete
-        const hasApToDelete = app.accessProfileIds.some(apId => apIdsToDelete.has(apId))
-        if (hasApToDelete) {
-            logger.debug(`App ${app.name} has ${app.accessProfileIds.length} access profiles, including some to be deleted`)
-        }
-        return hasApToDelete
+        return app.accessProfileIds.some(apId => apIdsToDelete.has(apId))
     })
 
     if (appsToUpdate.length > 0) {
@@ -485,19 +454,14 @@ async function deleteAccessProfilesAndApps(
         logger.info('No applications have the access profiles being deleted')
     }
 
-    // Step 5: Delete applications
-    // In delete mode, we should delete any existing apps that were created by this connector
-    // (from the same sources), regardless of the createApplication setting
+    // Step 5: Delete applications that were created by this connector
     const appsToDeleteByName = existingApps.filter(app => {
         if (!app.name || !app.id) return false
-
-        // If createApplication is true and we have expected names, only delete those
+        
         if (definition.createApplication && expectedAppNames.size > 0) {
             return expectedAppNames.has(app.name)
         }
-
-        // Otherwise, in delete mode, we should delete apps that match the definition name
-        // (this catches apps that were created when createApplication was true, but now it's false)
+        
         return app.name === definition.name
     })
 
@@ -522,12 +486,8 @@ async function deleteAccessProfilesAndApps(
             try {
                 logger.info(`Deleting access profile: ${ap.name}`)
                 await isc.deleteAccessProfile(ap.id!)
-            } catch (error: any) {
-                // Log full error details to help diagnose
+            } catch (error) {
                 logger.error(`Error deleting access profile ${ap.name}: ${error}`)
-                if (error.response) {
-                    logger.error(`API Response: ${JSON.stringify(error.response.data)}`)
-                }
             }
         })
     }
@@ -551,7 +511,6 @@ async function buildAccessProfilesFromEntitlements(
     const groups = new Map<string, EntitlementV2025[]>()
 
     for (const entitlement of entitlements) {
-        // Validate entitlement has required fields
         if (!entitlement.source?.id) {
             logger.warn(`Entitlement ${entitlement.id} has no source ID, skipping`)
             continue
@@ -560,7 +519,6 @@ async function buildAccessProfilesFromEntitlements(
         const context = { entitlement }
         const apName = evaluateVelocityExpression(definition.entitlementExpression, context)
 
-        // Skip if expression yielded nothing or unchanged
         if (!apName || apName === definition.entitlementExpression) {
             logger.debug(`Skipping entitlement ${entitlement.id}: expression evaluated to empty`)
             continue
@@ -576,13 +534,12 @@ async function buildAccessProfilesFromEntitlements(
     const accessProfiles: AccessProfileData[] = []
 
     for (const [apName, ents] of groups.entries()) {
-        // Check if we should discard due to overlap
         if (ents.length > 1 && !definition.groupEntitlements) {
             logger.warn(`Access profile ${apName} has ${ents.length} entitlements but groupEntitlements is false, discarding`)
             continue
         }
 
-        // Validate all entitlements have the same source (critical check)
+        // Validate all entitlements have the same source
         const firstSourceId = ents[0].source!.id!
         const mixedSources = ents.some(e => e.source?.id !== firstSourceId)
 
@@ -623,34 +580,29 @@ function groupAccessProfilesIntoApplications(
         let appName: string
 
         if (definition.groupAccessProfiles) {
-            // Multiple apps: evaluate applicationExpression per access profile
             if (!definition.applicationExpression) {
-                logger.error(`Access profile ${ap.name}: groupAccessProfiles is true but applicationExpression not defined, skipping`)
+                logger.error(`Access profile ${ap.name}: groupAccessProfiles is true but applicationExpression not defined`)
                 continue
             }
 
             const appContext: Record<string, unknown> = { name: ap.name }
-
+            appContext.entitlement = definition.groupEntitlements ? ap.entitlements : ap.entitlements[0]
             if (definition.groupEntitlements) {
                 appContext.entitlements = ap.entitlements
-            } else {
-                appContext.entitlement = ap.entitlements[0]
             }
 
             appName = evaluateVelocityExpression(definition.applicationExpression, appContext)
 
             if (!appName || appName === definition.applicationExpression) {
-                logger.error(`Access profile ${ap.name}: application expression evaluated to empty, skipping`)
+                logger.error(`Access profile ${ap.name}: application expression evaluated to empty`)
                 continue
             }
         } else {
-            // Single app: use definition name
             appName = definition.name
         }
 
         ap.appName = appName
 
-        // Get or create app entry
         let appData = appMap.get(appName)
         if (!appData) {
             appData = {
@@ -659,12 +611,9 @@ function groupAccessProfilesIntoApplications(
                 accessProfileNames: [],
             }
             appMap.set(appName, appData)
-        } else {
-            // Validate all APs in same app have same source
-            if (appData.sourceId !== ap.sourceId) {
-                logger.error(`Application ${appName} has access profiles from multiple sources (${appData.sourceId} and ${ap.sourceId}), skipping AP ${ap.name}`)
-                continue
-            }
+        } else if (appData.sourceId !== ap.sourceId) {
+            logger.error(`Application ${appName} has access profiles from multiple sources (${appData.sourceId} and ${ap.sourceId}), skipping AP ${ap.name}`)
+            continue
         }
 
         appData.accessProfileNames.push(ap.name)
@@ -680,25 +629,19 @@ function validateSourceConsistency(
     accessProfiles: AccessProfileData[],
     definition: AccessProfileDefinition
 ): void {
-    // Get unique source IDs
     const sourceIds = new Set(accessProfiles.map(ap => ap.sourceId))
 
     if (sourceIds.size <= 1) {
-        // Single source or no APs - no validation needed
         return
     }
 
     logger.info(`Definition ${definition.name} spans ${sourceIds.size} sources: ${Array.from(sourceIds).join(', ')}`)
 
     if (definition.createApplication) {
-        // Multiple sources with app creation: this is a critical error
-        // Apps can only be linked to one source, so this configuration is invalid
         const error = `Definition ${definition.name} has createApplication enabled but access profiles span multiple sources (${sourceIds.size} sources found). Applications can only be created for a single source. Either split this into separate definitions (one per source) or disable createApplication.`
         logger.error(error)
         throw new Error(error)
     } else {
-        // Multiple sources without app creation: log warning
-        // Access profiles can be created independently, but log this for visibility
         logger.warn(`Definition ${definition.name} creates access profiles across ${sourceIds.size} sources without creating applications. This is allowed but consider splitting into separate definitions for better organization.`)
     }
 }

@@ -1,5 +1,4 @@
 import {
-    AccessProfileDocumentsV2025,
     AccessProfilesV2025Api,
     AccessProfilesV2025ApiCreateAccessProfileRequest,
     AccessProfilesV2025ApiListAccessProfilesRequest,
@@ -27,7 +26,6 @@ import {
     PublicIdentityConfig,
     RequestabilityForRoleV2025,
     RequestabilityV2025,
-    RoleDocumentsV2025,
     RoleMembershipSelectorV2025,
     RolesV2025Api,
     RolesV2025ApiCreateRoleRequest,
@@ -40,6 +38,7 @@ import {
     SourcesApi,
     SourcesV2025Api,
 } from 'sailpoint-api-client'
+import { logger } from '@sailpoint/connector-sdk'
 import axios from 'axios'
 import axiosRetry from 'axios-retry'
 import { TOKEN_URL_PATH } from './data/constants'
@@ -171,7 +170,6 @@ export class ISCClient {
             xSailPointExperimental: 'true',
         }
         const response = await api.listAccessProfilesForSourceApp(requestParameters)
-        // Return array of access profile IDs
         return response.data.map((ap: any) => ap.id).filter(Boolean)
     }
 
@@ -401,8 +399,6 @@ export class ISCClient {
         if (entitlementIds.length === 0) return []
         const api = new SearchV2025Api(this.config)
         const results: LightweightAccessProfile[] = []
-        
-        // Batch into groups of 10 for efficiency
         const BATCH_SIZE = 10
         for (let i = 0; i < entitlementIds.length; i += BATCH_SIZE) {
             const batch = entitlementIds.slice(i, i + BATCH_SIZE)
@@ -414,7 +410,6 @@ export class ISCClient {
             const response = await api.searchPost({ searchV2025: searchRequest })
             const accessProfiles = response.data as any[]
             
-            // Extract only essential fields to reduce memory footprint
             for (const ap of accessProfiles) {
                 if (ap.id && ap.name) {
                     results.push({
@@ -446,22 +441,19 @@ export class ISCClient {
         if (entitlementIds.length === 0) return []
         const api = new SearchV2025Api(this.config)
         const results: LightweightRole[] = []
-        
-        // Batch into groups of 10 for efficiency
         const BATCH_SIZE = 10
         for (let i = 0; i < entitlementIds.length; i += BATCH_SIZE) {
             const batch = entitlementIds.slice(i, i + BATCH_SIZE)
             const query = batch.map((id) => `@entitlements(id:${id})`).join(' OR ')
-            console.log(`[DEBUG] Role search query batch ${i / BATCH_SIZE + 1}: ${query}`)
+            logger.debug(`Role search query batch ${i / BATCH_SIZE + 1}: ${query}`)
             const searchRequest: SearchV2025 = {
                 indices: ['roles' as any],
                 query: { query } as any,
             }
             const response = await api.searchPost({ searchV2025: searchRequest })
             const roles = response.data as any[]
-            console.log(`[DEBUG] Role search batch ${i / BATCH_SIZE + 1} returned ${roles.length} roles${roles.length > 0 ? ': ' + roles.map((r: any) => r.name).join(', ') : ''}`)
+            logger.debug(`Role search batch ${i / BATCH_SIZE + 1} returned ${roles.length} roles${roles.length > 0 ? ': ' + roles.map((r: any) => r.name).join(', ') : ''}`)
             
-            // Extract only essential fields to reduce memory footprint
             for (const role of roles) {
                 if (role.id && role.name) {
                     results.push({
@@ -486,11 +478,10 @@ export class ISCClient {
      */
     async searchAccessProfilesByNames(names: string[]): Promise<LightweightAccessProfile[]> {
         if (names.length === 0) return []
-        console.log(`[DEBUG] Fallback: Searching access profiles by name (${names.length} names)`)
+        logger.debug(`Fallback: Searching access profiles by name (${names.length} names)`)
         const api = new AccessProfilesV2025Api(this.config)
         const results: LightweightAccessProfile[] = []
         
-        // Fetch all access profiles and filter by name (API doesn't support name filters directly)
         const response = await Paginator.paginate(api, api.listAccessProfiles as any, {})
         const allAccessProfiles = response.data as any[]
         
@@ -510,7 +501,7 @@ export class ISCClient {
                 })
             }
         }
-        console.log(`[DEBUG] Fallback: Found ${results.length} access profiles by name: ${results.map(ap => ap.name).join(', ')}`)
+        logger.debug(`Fallback: Found ${results.length} access profiles by name: ${results.map(ap => ap.name).join(', ')}`)
         return results
     }
 
@@ -522,11 +513,10 @@ export class ISCClient {
      */
     async searchRolesByNames(names: string[]): Promise<LightweightRole[]> {
         if (names.length === 0) return []
-        console.log(`[DEBUG] Fallback: Searching roles by name (${names.length} names)`)
+        logger.debug(`Fallback: Searching roles by name (${names.length} names)`)
         const api = new RolesV2025Api(this.config)
         const results: LightweightRole[] = []
         
-        // Fetch all roles and filter by name (API doesn't support name filters directly)
         const response = await Paginator.paginate(api, api.listRoles as any, {})
         const allRoles = response.data as RoleV2025[]
         
@@ -542,7 +532,7 @@ export class ISCClient {
                 })
             }
         }
-        console.log(`[DEBUG] Fallback: Found ${results.length} roles by name: ${results.map(r => r.name).join(', ')}`)
+        logger.debug(`Fallback: Found ${results.length} roles by name: ${results.map(r => r.name).join(', ')}`)
         return results
     }
 }
