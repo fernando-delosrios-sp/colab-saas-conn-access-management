@@ -80,7 +80,7 @@
                                         {
                                             "key": "query",
                                             "label": "Entitlement query",
-                                            "helpKey": "ISC V3 search filter for selecting entitlements (e.g., 'source.name:\"Active Directory\" AND name:*Admin*'). See https://developer.sailpoint.com/docs/api/v3/list-entitlements for query syntax.",
+                                            "helpKey": "Filter query for the List Entitlements API using 'filters' parameter syntax. Supports SCIM-like filtering (e.g., 'source.name eq \"Active Directory\" and name sw \"Admin\"'). See https://developer.sailpoint.com/docs/api/v2025/list-entitlements for query syntax.",
                                             "type": "text",
                                             "required": true
                                         },
@@ -186,7 +186,7 @@
                                         {
                                             "key": "query",
                                             "label": "Entitlement query",
-                                            "helpKey": "ISC V3 search filter for selecting entitlements (e.g., 'source.name:\"Workday\" AND attribute:Department'). See https://developer.sailpoint.com/docs/api/v3/list-entitlements for query syntax.",
+                                            "helpKey": "Filter query for the List Entitlements API using 'filters' parameter syntax. Supports SCIM-like filtering (e.g., 'source.name eq \"Workday\" and attribute eq \"Department\"'). See https://developer.sailpoint.com/docs/api/v2025/list-entitlements for query syntax.",
                                             "type": "text",
                                             "required": true
                                         },
@@ -326,7 +326,7 @@
                                         {
                                             "key": "query",
                                             "label": "Entitlement query",
-                                            "helpKey": "ISC V3 search filter for selecting entitlements (e.g., 'source.name:\"SAP\" AND privileged:true'). See https://developer.sailpoint.com/docs/api/v3/list-entitlements for query syntax.",
+                                            "helpKey": "Filter query for the List Entitlements API using 'filters' parameter syntax. Supports SCIM-like filtering (e.g., 'source.name eq \"SAP\" and privileged eq true'). See https://developer.sailpoint.com/docs/api/v2025/list-entitlements for query syntax.",
                                             "type": "text",
                                             "required": true
                                         },
