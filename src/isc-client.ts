@@ -7,13 +7,18 @@ import {
     AppsV2025Api,
     AppsV2025ApiCreateSourceAppRequest,
     AppsV2025ApiGetSourceAppRequest,
+    AppsV2025ApiListAccessProfilesForSourceAppRequest,
     AppsV2025ApiListAllSourceAppRequest,
     AppsV2025ApiPatchSourceAppRequest,
     Configuration,
     ConfigurationParameters,
+    EntitlementBulkUpdateRequestV2025,
     EntitlementRefV2025,
+    EntitlementRequestConfigV2025,
     EntitlementsV2025Api,
     EntitlementsV2025ApiListEntitlementsRequest,
+    EntitlementsV2025ApiPutEntitlementRequestConfigRequest,
+    EntitlementsV2025ApiUpdateEntitlementsInBulkRequest,
     EntitlementV2025,
     JsonPatchOperationV2025,
     Paginator,
@@ -27,15 +32,46 @@ import {
     RolesV2025ApiListRolesRequest,
     RolesV2025ApiPatchRoleRequest,
     RoleV2025,
+    SearchV2025,
+    SearchV2025Api,
     SourceAppV2025,
     SourcesApi,
     SourcesV2025Api,
 } from 'sailpoint-api-client'
+import { logger } from '@sailpoint/connector-sdk'
+import axios from 'axios'
+import axiosRetry from 'axios-retry'
 import { TOKEN_URL_PATH } from './data/constants'
 import { Config } from './model/config'
+import { retriesConfig } from './axios'
+import { throttle } from './utils/throttle'
+
+// Lightweight types for search results - only keep essential fields to reduce memory
+export interface LightweightAccessProfile {
+    id: string
+    name: string
+    entitlements?: Array<{ id?: string | null }> | null
+    requestable?: boolean
+    accessRequestConfig?: unknown
+    app?: {
+        id?: string
+        name?: string
+        accountSource?: { id?: string } | null
+    }
+}
+
+export interface LightweightRole {
+    id: string
+    name: string
+    entitlements?: Array<{ id?: string | null }> | null
+    requestable?: boolean
+    accessRequestConfig?: unknown
+    membership?: unknown
+}
 
 export class ISCClient {
     private config: Configuration
+    private static throttleInterceptorId: number | null = null
 
     constructor(config: Config) {
         const conf: ConfigurationParameters = {
@@ -45,7 +81,20 @@ export class ISCClient {
             tokenUrl: new URL(config.baseurl).origin + TOKEN_URL_PATH,
         }
         this.config = new Configuration(conf)
+        this.config.retriesConfig = retriesConfig
         this.config.experimental = true
+        axiosRetry(axios as any, retriesConfig)
+
+        // Throttle: 100 requests per 10 seconds (ISC rate limit)
+        if (ISCClient.throttleInterceptorId === null) {
+            ISCClient.throttleInterceptorId = axios.interceptors.request.use(
+                async (config) => {
+                    await throttle()
+                    return config
+                },
+                (error) => Promise.reject(error)
+            )
+        }
     }
 
     async getPublicIdentityConfig(): Promise<PublicIdentityConfig> {
@@ -69,12 +118,8 @@ export class ISCClient {
         const requestParameters: EntitlementsV2025ApiListEntitlementsRequest = {
             filters,
         }
-        const listEntitlements = () => {
-            return api.listEntitlements(requestParameters)
-        }
-
-        const response = await Paginator.paginate(api, listEntitlements)
-        return response.data
+        const response = await Paginator.paginate(api, api.listEntitlements, requestParameters)
+        return response.data as EntitlementV2025[]
     }
 
     async getAccessProfileByName(name: string): Promise<AccessProfileV2025 | undefined> {
@@ -106,6 +151,26 @@ export class ISCClient {
 
         const response = await api.listAllSourceApp(requestParameters)
         return response.data[0] ? response.data[0] : undefined
+    }
+
+    async getAppById(id: string): Promise<SourceAppV2025> {
+        const api = new AppsV2025Api(this.config)
+        const requestParameters: AppsV2025ApiGetSourceAppRequest = {
+            id,
+            xSailPointExperimental: 'true',
+        }
+        const response = await api.getSourceApp(requestParameters)
+        return response.data
+    }
+
+    async getAppAccessProfiles(appId: string): Promise<string[]> {
+        const api = new AppsV2025Api(this.config)
+        const requestParameters: AppsV2025ApiListAccessProfilesForSourceAppRequest = {
+            id: appId,
+            xSailPointExperimental: 'true',
+        }
+        const response = await api.listAccessProfilesForSourceApp(requestParameters)
+        return response.data.map((ap: any) => ap.id).filter(Boolean)
     }
 
     async createApp(name: string, sourceId: string): Promise<SourceAppV2025> {
@@ -228,5 +293,246 @@ export class ISCClient {
         }
         const response = await api.patchRole(requestParameters)
         return response.data
+    }
+
+    /**
+     * Bulk update entitlements (requestable, privileged, etc.). Max 50 entitlements per request.
+     * @see https://developer.sailpoint.com/docs/api/v2025/update-entitlements-in-bulk
+     */
+    async updateEntitlementsInBulk(
+        entitlementIds: string[],
+        jsonPatch: JsonPatchOperationV2025[]
+    ): Promise<void> {
+        const api = new EntitlementsV2025Api(this.config)
+        const body: EntitlementBulkUpdateRequestV2025 = {
+            entitlementIds,
+            jsonPatch,
+        }
+        const requestParameters: EntitlementsV2025ApiUpdateEntitlementsInBulkRequest = {
+            entitlementBulkUpdateRequestV2025: body,
+        }
+        await api.updateEntitlementsInBulk(requestParameters)
+    }
+
+    /**
+     * Replace entitlement request config (approval schemes) for a single entitlement.
+     * @see https://developer.sailpoint.com/docs/api/v2025/put-entitlement-request-config
+     */
+    async putEntitlementRequestConfig(
+        id: string,
+        entitlementRequestConfigV2025: EntitlementRequestConfigV2025
+    ): Promise<EntitlementRequestConfigV2025> {
+        const api = new EntitlementsV2025Api(this.config)
+        const requestParameters: EntitlementsV2025ApiPutEntitlementRequestConfigRequest = {
+            id,
+            entitlementRequestConfigV2025,
+        }
+        const response = await api.putEntitlementRequestConfig(requestParameters)
+        return response.data
+    }
+
+    /**
+     * List access profiles filtered by source IDs. Uses source.id in ("id1","id2") filter.
+     */
+    async listAccessProfilesBySources(sourceIds: string[]): Promise<AccessProfileV2025[]> {
+        if (sourceIds.length === 0) return []
+        const api = new AccessProfilesV2025Api(this.config)
+        const filterValue = sourceIds.map((id) => `"${id}"`).join(',')
+        const filters = `source.id in (${filterValue})`
+        const requestParameters: AccessProfilesV2025ApiListAccessProfilesRequest = { filters }
+        const response = await Paginator.paginate(api, api.listAccessProfiles as any, requestParameters)
+        return response.data as AccessProfileV2025[]
+    }
+
+    /**
+     * List source apps filtered by account source IDs.
+     */
+    async listAppsBySources(sourceIds: string[]): Promise<SourceAppV2025[]> {
+        if (sourceIds.length === 0) return []
+        const api = new AppsV2025Api(this.config)
+        const filterValue = sourceIds.map((id) => `"${id}"`).join(',')
+        const filters = `accountSource.id in (${filterValue})`
+        const requestParameters: AppsV2025ApiListAllSourceAppRequest = {
+            filters,
+            xSailPointExperimental: 'true',
+        }
+        const response = await Paginator.paginate(api, api.listAllSourceApp as any, requestParameters)
+        return response.data as SourceAppV2025[]
+    }
+
+    /**
+     * List roles filtered by owner IDs.
+     */
+    async listRolesByOwners(ownerIds: string[]): Promise<RoleV2025[]> {
+        if (ownerIds.length === 0) return []
+        const api = new RolesV2025Api(this.config)
+        const filterValue = ownerIds.map((id) => `"${id}"`).join(',')
+        const filters = `owner.id in (${filterValue})`
+        const requestParameters: RolesV2025ApiListRolesRequest = { filters }
+        const response = await Paginator.paginate(api, api.listRoles as any, requestParameters)
+        return response.data as RoleV2025[]
+    }
+
+    async deleteAccessProfile(id: string): Promise<void> {
+        const api = new AccessProfilesV2025Api(this.config)
+        await api.deleteAccessProfile({ id })
+    }
+
+    async deleteRole(id: string): Promise<void> {
+        const api = new RolesV2025Api(this.config)
+        await api.deleteRole({ id })
+    }
+
+    async deleteSourceApp(id: string): Promise<void> {
+        const api = new AppsV2025Api(this.config)
+        await api.deleteSourceApp({ id, xSailPointExperimental: 'true' })
+    }
+
+    /**
+     * Search for access profiles by entitlement IDs using the Search API.
+     * Batches up to 10 entitlements per query for efficiency.
+     * Returns only essential fields to minimize memory usage.
+     * @param entitlementIds List of entitlement IDs to search for
+     * @returns Lightweight access profiles with only essential fields
+     */
+    async searchAccessProfilesByEntitlements(entitlementIds: string[]): Promise<LightweightAccessProfile[]> {
+        if (entitlementIds.length === 0) return []
+        const api = new SearchV2025Api(this.config)
+        const results: LightweightAccessProfile[] = []
+        const BATCH_SIZE = 10
+        for (let i = 0; i < entitlementIds.length; i += BATCH_SIZE) {
+            const batch = entitlementIds.slice(i, i + BATCH_SIZE)
+            const query = batch.map((id) => `@entitlements(id:${id})`).join(' OR ')
+            const searchRequest: SearchV2025 = {
+                indices: ['accessprofiles' as any],
+                query: { query } as any,
+            }
+            const response = await api.searchPost({ searchV2025: searchRequest })
+            const accessProfiles = response.data as any[]
+            
+            for (const ap of accessProfiles) {
+                if (ap.id && ap.name) {
+                    results.push({
+                        id: ap.id,
+                        name: ap.name,
+                        entitlements: ap.entitlements,
+                        requestable: ap.requestable,
+                        accessRequestConfig: ap.accessRequestConfig,
+                        app: ap.app ? {
+                            id: ap.app.id,
+                            name: ap.app.name,
+                            accountSource: ap.app.accountSource,
+                        } : undefined,
+                    })
+                }
+            }
+        }
+        return results
+    }
+
+    /**
+     * Search for roles by entitlement IDs using the Search API.
+     * Batches up to 10 entitlements per query for efficiency.
+     * Returns only essential fields to minimize memory usage.
+     * @param entitlementIds List of entitlement IDs to search for
+     * @returns Lightweight roles with only essential fields
+     */
+    async searchRolesByEntitlements(entitlementIds: string[]): Promise<LightweightRole[]> {
+        if (entitlementIds.length === 0) return []
+        const api = new SearchV2025Api(this.config)
+        const results: LightweightRole[] = []
+        const BATCH_SIZE = 10
+        for (let i = 0; i < entitlementIds.length; i += BATCH_SIZE) {
+            const batch = entitlementIds.slice(i, i + BATCH_SIZE)
+            const query = batch.map((id) => `@entitlements(id:${id})`).join(' OR ')
+            logger.debug(`Role search query batch ${i / BATCH_SIZE + 1}: ${query}`)
+            const searchRequest: SearchV2025 = {
+                indices: ['roles' as any],
+                query: { query } as any,
+            }
+            const response = await api.searchPost({ searchV2025: searchRequest })
+            const roles = response.data as any[]
+            logger.debug(`Role search batch ${i / BATCH_SIZE + 1} returned ${roles.length} roles${roles.length > 0 ? ': ' + roles.map((r: any) => r.name).join(', ') : ''}`)
+            
+            for (const role of roles) {
+                if (role.id && role.name) {
+                    results.push({
+                        id: role.id,
+                        name: role.name,
+                        entitlements: role.entitlements,
+                        requestable: role.requestable,
+                        accessRequestConfig: role.accessRequestConfig,
+                        membership: role.membership,
+                    })
+                }
+            }
+        }
+        return results
+    }
+
+    /**
+     * Fallback: Search for access profiles by exact name matches using the dedicated API.
+     * Used when Search API returns no results (e.g., for special sources).
+     * @param names Array of exact access profile names to search for
+     * @returns Lightweight access profiles matching the given names
+     */
+    async searchAccessProfilesByNames(names: string[]): Promise<LightweightAccessProfile[]> {
+        if (names.length === 0) return []
+        logger.debug(`Fallback: Searching access profiles by name (${names.length} names)`)
+        const api = new AccessProfilesV2025Api(this.config)
+        const results: LightweightAccessProfile[] = []
+        
+        const response = await Paginator.paginate(api, api.listAccessProfiles as any, {})
+        const allAccessProfiles = response.data as any[]
+        
+        for (const accessProfile of allAccessProfiles) {
+            if (accessProfile.name && names.includes(accessProfile.name)) {
+                results.push({
+                    id: accessProfile.id!,
+                    name: accessProfile.name,
+                    entitlements: accessProfile.entitlements,
+                    requestable: accessProfile.requestable,
+                    accessRequestConfig: accessProfile.accessRequestConfig,
+                    app: accessProfile.app ? {
+                        id: accessProfile.app.id,
+                        name: accessProfile.app.name,
+                        accountSource: accessProfile.app.accountSource,
+                    } : undefined,
+                })
+            }
+        }
+        logger.debug(`Fallback: Found ${results.length} access profiles by name: ${results.map(ap => ap.name).join(', ')}`)
+        return results
+    }
+
+    /**
+     * Fallback: Search for roles by exact name matches using the dedicated API.
+     * Used when Search API returns no results (e.g., for special sources).
+     * @param names Array of exact role names to search for
+     * @returns Lightweight roles matching the given names
+     */
+    async searchRolesByNames(names: string[]): Promise<LightweightRole[]> {
+        if (names.length === 0) return []
+        logger.debug(`Fallback: Searching roles by name (${names.length} names)`)
+        const api = new RolesV2025Api(this.config)
+        const results: LightweightRole[] = []
+        
+        const response = await Paginator.paginate(api, api.listRoles as any, {})
+        const allRoles = response.data as RoleV2025[]
+        
+        for (const role of allRoles) {
+            if (role.name && names.includes(role.name)) {
+                results.push({
+                    id: role.id!,
+                    name: role.name,
+                    entitlements: role.entitlements,
+                    requestable: role.requestable,
+                    accessRequestConfig: role.accessRequestConfig,
+                    membership: role.membership,
+                })
+            }
+        }
+        logger.debug(`Fallback: Found ${results.length} roles by name: ${results.map(r => r.name).join(', ')}`)
+        return results
     }
 }

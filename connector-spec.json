@@ -1,11 +1,13 @@
 {
     "name": "Access Management",
-    "description": "Access Management Connector for automated application, access profile and role management",
-    "commands": ["std:entitlement:list", "std:test-connection"],
+    "description": "Automated entitlement governance connector for Identity Security Cloud. Enables bulk updates to entitlement properties, automated access profile and application creation and management, and role lifecycle management using flexible query-based selection and Velocity expressions.",
+    "commands": [
+        "std:entitlement:list",
+        "std:test-connection"
+    ],
     "showDebugLoggingOption": true,
     "sourceConfigInitialValues": {
-        "accessProfiles.nameTemplate": "$name ($_source)",
-        "roles.nameTemplate": "$name"
+        "nameTemplate": "$name"
     },
     "sourceConfig": [
         {
@@ -15,25 +17,28 @@
                 {
                     "type": "section",
                     "sectionTitle": "Identity Security Cloud connection configuration",
-                    "sectionHelpMessage": "Configuration details for Identity Security Cloud Tenant",
+                    "sectionHelpMessage": "Connect to your Identity Security Cloud tenant using Personal Access Token (PAT) authentication. The PAT requires appropriate permissions for entitlement, access profile, role, source, and application management.",
                     "items": [
                         {
                             "key": "baseurl",
                             "label": "Identity Security Cloud API URL",
                             "type": "url",
-                            "required": true
+                            "required": true,
+                            "helpKey": "Your tenant API URL, typically in the format: https://{tenant}.api.identitynow.com"
                         },
                         {
                             "key": "clientId",
                             "label": "Personal Access Token ID",
                             "type": "text",
-                            "required": true
+                            "required": true,
+                            "helpKey": "The Client ID from your Personal Access Token (PAT)"
                         },
                         {
                             "key": "clientSecret",
                             "label": "Personal Access Token secret",
                             "type": "secret",
-                            "required": true
+                            "required": true,
+                            "helpKey": "The Client Secret from your Personal Access Token (PAT)"
                         }
                     ]
                 }
@@ -41,12 +46,118 @@
         },
         {
             "type": "menu",
-            "label": "Access Profiles",
+            "label": "Entitlements",
             "items": [
                 {
                     "type": "section",
-                    "sectionTitle": "Access Profiles Configuration",
-                    "sectionHelpMessage": "Add your access profile definitions here",
+                    "sectionTitle": "Entitlement Aggregation Configuration",
+                    "sectionHelpMessage": "Configure bulk updates to entitlements across your sources. Update requestable/privileged flags and approval configurations without creating access profiles or roles. Each definition uses an API query to select entitlements, then applies a Velocity expression filter.",
+                    "items": [
+                        {
+                            "key": "entitlements",
+                            "label": "Entitlement Update Definitions",
+                            "titleKey": "query",
+                            "subtitleKey": "name",
+                            "dragNDropEnabled": true,
+                            "deleteButton": true,
+                            "editButton": true,
+                            "addButton": true,
+                            "copyButton": true,
+                            "buttonLabel": "New Entitlement Update Definition",
+                            "type": "cardList",
+                            "helpKey": "Add definitions to select and bulk-update entitlements. Each definition queries entitlements via the Entitlement API, filters them using a Velocity expression, then applies property updates (requestable, privileged) via bulk update API and optionally configures approval workflows per entitlement.",
+                            "subMenus": [
+                                {
+                                    "label": "Selection configuration",
+                                    "items": [
+                                        {
+                                            "key": "name",
+                                            "label": "Definition Name",
+                                            "type": "text",
+                                            "required": true,
+                                            "helpKey": "Descriptive name for this entitlement update definition. Used for identification and logging purposes only; not visible in ISC UI."
+                                        },
+                                        {
+                                            "key": "query",
+                                            "label": "Entitlement query",
+                                            "helpKey": "Filter query for the List Entitlements API using 'filters' parameter syntax. Supports SCIM-like filtering (e.g., 'source.name eq \"Active Directory\" and name sw \"Admin\"'). See https://developer.sailpoint.com/docs/api/v2025/list-entitlements for query syntax.",
+                                            "type": "text",
+                                            "required": true
+                                        },
+                                        {
+                                            "key": "entitlementExpression",
+                                            "label": "Entitlement expression",
+                                            "helpKey": "Velocity expression to filter selected entitlements. Return any non-empty value to include the entitlement, or return empty/null to exclude. Context variables: $entitlement (entire entitlement object), or direct field access (e.g., $name, $value, $attribute). Example: #if($name.contains('Admin'))include#end",
+                                            "type": "textarea",
+                                            "required": true
+                                        }
+                                    ]
+                                },
+                                {
+                                    "label": "Update configuration",
+                                    "items": [
+                                        {
+                                            "key": "privileged",
+                                            "label": "Privileged",
+                                            "type": "toggle",
+                                            "helpKey": "Mark entitlements as privileged via bulk update API. Privileged entitlements typically represent elevated permissions requiring additional controls.",
+                                            "required": false
+                                        },
+                                        {
+                                            "key": "requestable",
+                                            "label": "Requestable",
+                                            "type": "toggle",
+                                            "helpKey": "Make entitlements requestable via bulk update API. Requestable entitlements can be requested by users through the ISC access request system.",
+                                            "required": false
+                                        },
+                                        {
+                                            "key": "requireApproval",
+                                            "label": "Require approval?",
+                                            "type": "toggle",
+                                            "parentKey": "requestable",
+                                            "parentValue": "true",
+                                            "helpKey": "Require approval for access requests via entitlement request config API. When enabled, requests for these entitlements will require approval from the designated approver type.",
+                                            "required": false
+                                        },
+                                        {
+                                            "key": "approverType",
+                                            "label": "Approver",
+                                            "helpKey": "Designate who approves entitlement access requests (PUT entitlement-request-config API). ENTITLEMENT_OWNER: entitlement owner. SOURCE_OWNER: source owner. MANAGER: requestor's manager.",
+                                            "type": "select",
+                                            "required": true,
+                                            "parentKey": "requireApproval",
+                                            "parentValue": "true",
+                                            "options": [
+                                                {
+                                                    "label": "Entitlement Owner",
+                                                    "value": "ENTITLEMENT_OWNER"
+                                                },
+                                                {
+                                                    "label": "Source Owner",
+                                                    "value": "SOURCE_OWNER"
+                                                },
+                                                {
+                                                    "label": "Manager",
+                                                    "value": "MANAGER"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "menu",
+            "label": "Access Profiles & Applications",
+            "items": [
+                {
+                    "type": "section",
+                    "sectionTitle": "Access Profiles and Applications Configuration",
+                    "sectionHelpMessage": "Automate access profile and application creation and management. Each definition queries entitlements, groups them into access profiles by Velocity expression results, and optionally creates applications to organize those access profiles. Applications provide a higher-level container that makes access easier to discover and request. Supports both creation/update mode and deletion mode.",
                     "items": [
                         {
                             "key": "accessProfiles",
@@ -60,64 +171,31 @@
                             "copyButton": true,
                             "buttonLabel": "New Access Profile Group Definition",
                             "type": "cardList",
-                            "helpKey": "Add definitions to build your access profiles",
+                            "helpKey": "Define how access profiles and applications are created from entitlements. Each definition: (1) queries entitlements, (2) filters via Velocity expression, (3) groups entitlements into access profiles (1:1 or many:1), (4) creates/updates access profiles, (5) optionally creates applications and assigns access profiles to them. Use velocity expressions with access to $entitlement, $name, $entitlements (array), and custom fields.",
                             "subMenus": [
                                 {
-                                    "label": "Group configuration",
+                                    "label": "Selection configuration",
                                     "items": [
                                         {
                                             "key": "name",
-                                            "label": "Access Profile Group Name",
+                                            "label": "Access Profile Configuration Name",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "Access Profile Group Name"
+                                            "helpKey": "Descriptive name for this access profile definition. Used for identification and logging only; not visible in ISC UI. The actual access profile names are determined by the entitlementExpression."
                                         },
                                         {
                                             "key": "query",
                                             "label": "Entitlement query",
-                                            "helpKey": "Entitlement query (filter) for Entitlement API",
+                                            "helpKey": "Filter query for the List Entitlements API using 'filters' parameter syntax. Supports SCIM-like filtering (e.g., 'source.name eq \"Workday\" and attribute eq \"Department\"'). See https://developer.sailpoint.com/docs/api/v2025/list-entitlements for query syntax.",
                                             "type": "text",
                                             "required": true
                                         },
                                         {
-                                            "key": "groupByAttribute",
-                                            "label": "Group entitlements by attribute?",
-                                            "type": "checkbox",
-                                            "helpKey": "Group entitlements to build access profiles"
-                                        },
-                                        {
-                                            "key": "groupAttribute",
-                                            "label": "Group Attribute",
-                                            "helpKey": "Entitlement attribute to group by",
-                                            "type": "text",
-                                            "parentKey": "groupByAttribute",
-                                            "parentValue": "true",
+                                            "key": "entitlementExpression",
+                                            "label": "Entitlement expression",
+                                            "helpKey": "Velocity expression that determines the access profile name. Return empty to exclude the entitlement. When groupEntitlements=true, entitlements with the same result are grouped into one access profile. When false, each entitlement creates one access profile (1:1). Context: $entitlement object or fields like $name, $value. Example: $attribute",
+                                            "type": "textarea",
                                             "required": true
-                                        },
-                                        {
-                                            "key": "groupType",
-                                            "label": "Group Type",
-                                            "helpKey": "Choose how to group entitlements",
-                                            "type": "select",
-                                            "required": true,
-                                            "parentKey": "groupByAttribute",
-                                            "parentValue": "true",
-                                            "options": [
-                                                {
-                                                    "label": "Application",
-                                                    "value": "application"
-                                                },
-                                                {
-                                                    "label": "Access Profile",
-                                                    "value": "accessProfile"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "key": "createApplication",
-                                            "label": "Create application?",
-                                            "type": "checkbox",
-                                            "helpKey": "Create application and assign to access profiles"
                                         }
                                     ]
                                 },
@@ -125,32 +203,39 @@
                                     "label": "Access Profile configuration",
                                     "items": [
                                         {
-                                            "key": "nameTemplate",
-                                            "label": "Access Profile Name Template",
-                                            "type": "text",
-                                            "required": true,
-                                            "helpKey": "Velocity template for building access profile names. Use $_source for source name and $_group for group name. Use $name for entitlement name and $value for entitlement value. Any other attributes from the schema can be used as well."
+                                            "key": "deleteMode",
+                                            "label": "Delete mode",
+                                            "type": "toggle",
+                                            "helpKey": "DELETION MODE: When enabled, this definition will DELETE both access profiles and applications instead of creating/updating them. Only objects previously created by this definition (matching the source and naming pattern) will be deleted. Use with extreme caution."
+                                        },
+                                        {
+                                            "key": "groupEntitlements",
+                                            "label": "Group entitlements into access profiles?",
+                                            "type": "toggle",
+                                            "helpKey": "ENABLED: Multiple entitlements with the same entitlementExpression result are grouped into one access profile (many:1). DISABLED: Each entitlement creates its own access profile (1:1 mapping). When disabled, overlapping entitlements are discarded to prevent duplicates."
                                         },
                                         {
                                             "key": "requestable",
                                             "label": "Requestable",
-                                            "type": "checkbox",
-                                            "helpKey": "Make access profiles requestable",
-                                            "required": true
+                                            "type": "toggle",
+                                            "parentKey": "deleteMode",
+                                            "parentValue": "false",
+                                            "helpKey": "Make access profiles requestable through the ISC access request system. Users can request these access profiles via the request center.",
+                                            "required": false
                                         },
                                         {
                                             "key": "requireApproval",
                                             "label": "Require approval?",
-                                            "type": "checkbox",
+                                            "type": "toggle",
                                             "parentKey": "requestable",
                                             "parentValue": "true",
-                                            "helpKey": "Require approval on request",
-                                            "required": true
+                                            "helpKey": "Require approval for access requests. When enabled, requests for these access profiles must be approved by the designated approver type before being granted.",
+                                            "required": false
                                         },
                                         {
                                             "key": "approverType",
                                             "label": "Approver",
-                                            "helpKey": "Select request approver",
+                                            "helpKey": "Designate who approves access profile requests. APP_OWNER: application owner (if access profile is part of an application). OWNER: access profile owner. SOURCE_OWNER: source owner. MANAGER: requestor's manager.",
                                             "type": "select",
                                             "required": true,
                                             "parentKey": "requireApproval",
@@ -173,6 +258,29 @@
                                                     "value": "MANAGER"
                                                 }
                                             ]
+                                        },
+                                        {
+                                            "key": "createApplication",
+                                            "label": "Create application(s)?",
+                                            "type": "toggle",
+                                            "helpKey": "Create ISC applications to group and organize access profiles. Applications provide a higher-level container for related access profiles, making them easier to manage and request."
+                                        },
+                                        {
+                                            "key": "groupAccessProfiles",
+                                            "label": "Group access profiles into multiple applications?",
+                                            "type": "toggle",
+                                            "parentKey": "createApplication",
+                                            "parentValue": "true",
+                                            "helpKey": "ENABLED: Access profiles are distributed across multiple applications based on applicationExpression result. DISABLED: All access profiles from this definition go into a single application named after the definition name."
+                                        },
+                                        {
+                                            "key": "applicationExpression",
+                                            "label": "Application name expression",
+                                            "type": "textarea",
+                                            "required": true,
+                                            "parentKey": "groupAccessProfiles",
+                                            "parentValue": "true",
+                                            "helpKey": "Velocity expression to name applications (evaluated per access profile). Context variables: $name (access profile name). If groupEntitlements=false: $entitlement (single entitlement object). If groupEntitlements=true: $entitlements (array of entitlement objects). Example: ${name}_App or $entitlement.source.name"
                                         }
                                     ]
                                 }
@@ -189,7 +297,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Roles Configuration",
-                    "sectionHelpMessage": "Add your role definitions here",
+                    "sectionHelpMessage": "Automate role creation and management. Each definition queries entitlements, groups them by Velocity expression results, and creates or updates roles with optional automatic assignment via membership criteria. Supports both creation/update mode and deletion mode.",
                     "items": [
                         {
                             "key": "roles",
@@ -203,38 +311,30 @@
                             "copyButton": true,
                             "buttonLabel": "New Role Group Definition",
                             "type": "cardList",
-                            "helpKey": "Add definitions to build your roles",
+                            "helpKey": "Define how roles are created from entitlements. Each definition: (1) queries entitlements, (2) filters via Velocity expression, (3) groups entitlements (all in one role or by expression result), (4) creates/updates roles, (5) optionally sets automatic assignment via membership criteria. Context: $entitlement object or fields.",
                             "subMenus": [
                                 {
-                                    "label": "Group configuration",
+                                    "label": "Selection configuration",
                                     "items": [
                                         {
                                             "key": "name",
                                             "label": "Role Group Name",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "Role Group Name"
+                                            "helpKey": "Name for this role group definition. When groupEntitlements=false, this is also the actual role name created in ISC. When groupEntitlements=true, individual role names are determined by the entitlementExpression."
                                         },
                                         {
                                             "key": "query",
                                             "label": "Entitlement query",
-                                            "helpKey": "Entitlement query (filter) for Entitlement API",
+                                            "helpKey": "Filter query for the List Entitlements API using 'filters' parameter syntax. Supports SCIM-like filtering (e.g., 'source.name eq \"SAP\" and privileged eq true'). See https://developer.sailpoint.com/docs/api/v2025/list-entitlements for query syntax.",
                                             "type": "text",
                                             "required": true
                                         },
                                         {
-                                            "key": "groupByAttribute",
-                                            "label": "Group entitlements by attribute?",
-                                            "type": "checkbox",
-                                            "helpKey": "Group entitlements to build roles"
-                                        },
-                                        {
-                                            "key": "groupAttribute",
-                                            "label": "Group Attribute",
-                                            "helpKey": "Entitlement attribute to group by",
-                                            "type": "text",
-                                            "parentKey": "groupByAttribute",
-                                            "parentValue": "true",
+                                            "key": "entitlementExpression",
+                                            "label": "Entitlement expression",
+                                            "helpKey": "Velocity expression for filtering and/or naming roles. Return empty to exclude entitlement. When groupEntitlements=true, the result becomes the role name and entitlements with the same result are grouped together. Context: $entitlement object.",
+                                            "type": "textarea",
                                             "required": true
                                         }
                                     ]
@@ -243,40 +343,55 @@
                                     "label": "Role configuration",
                                     "items": [
                                         {
-                                            "key": "nameTemplate",
-                                            "label": "Role Name Template",
-                                            "type": "text",
-                                            "required": true,
-                                            "helpKey": "Velocity template for building role names. Use $_source for source name and $_group for group name. Use $name for entitlement name and $value for entitlement value. Any other attributes from the schema can be used as well."
+                                            "key": "deleteStaleRoles",
+                                            "label": "Delete roles?",
+                                            "type": "toggle",
+                                            "helpKey": "DELETION MODE: When enabled, this definition will DELETE roles instead of creating/updating them. Only roles previously created by this definition (matching the source and naming pattern) will be deleted. Use with extreme caution."
+                                        },
+                                        {
+                                            "key": "groupEntitlements",
+                                            "label": "Group entitlements by expression?",
+                                            "type": "toggle",
+                                            "helpKey": "ENABLED: Create multiple roles by grouping entitlements with the same entitlementExpression result (many:1 mapping). DISABLED: Create one role containing all selected entitlements (all:1 mapping, role named by definition name)."
                                         },
                                         {
                                             "key": "requestable",
                                             "label": "Requestable",
-                                            "type": "checkbox",
-                                            "helpKey": "Make access profiles requestable",
-                                            "required": true
+                                            "type": "toggle",
+                                            "parentKey": "deleteStaleRoles",
+                                            "parentValue": "false",
+                                            "helpKey": "Make roles requestable through the ISC access request system. Users can request these roles via the request center.",
+                                            "required": false
                                         },
                                         {
                                             "key": "requireApproval",
                                             "label": "Require approval?",
-                                            "type": "checkbox",
+                                            "type": "toggle",
                                             "parentKey": "requestable",
                                             "parentValue": "true",
-                                            "helpKey": "Require approval on request",
-                                            "required": true
+                                            "helpKey": "Require approval for role requests. When enabled, requests for these roles must be approved by the designated approver type before being granted.",
+                                            "required": false
                                         },
                                         {
                                             "key": "approverType",
                                             "label": "Approver",
-                                            "helpKey": "Select request approver",
+                                            "helpKey": "Designate who approves role requests. APP_OWNER: application owner (if role includes access profiles from applications). OWNER: role owner. SOURCE_OWNER: source owner. MANAGER: requestor's manager.",
                                             "type": "select",
                                             "required": true,
                                             "parentKey": "requireApproval",
                                             "parentValue": "true",
                                             "options": [
                                                 {
+                                                    "label": "Application Owner",
+                                                    "value": "APP_OWNER"
+                                                },
+                                                {
                                                     "label": "Owner",
                                                     "value": "OWNER"
+                                                },
+                                                {
+                                                    "label": "Source Owner",
+                                                    "value": "SOURCE_OWNER"
                                                 },
                                                 {
                                                     "label": "Manager",
@@ -287,11 +402,11 @@
                                         {
                                             "key": "automaticAssignment",
                                             "label": "Automatic Assignment?",
-                                            "type": "checkbox",
-                                            "parentKey": "requestable",
-                                            "parentValue": "true",
-                                            "helpKey": "Automatically assign role if criteria is met",
-                                            "required": true
+                                            "type": "toggle",
+                                            "parentKey": "deleteStaleRoles",
+                                            "parentValue": "false",
+                                            "helpKey": "Automatically assign roles to identities when membership criteria are met. When enabled, identities matching the assignment criteria will automatically receive this role.",
+                                            "required": false
                                         },
                                         {
                                             "key": "assignmentDefinition",
@@ -300,7 +415,7 @@
                                             "required": true,
                                             "parentKey": "automaticAssignment",
                                             "parentValue": "true",
-                                            "helpKey": "Check https://github.com/yannick-beot-sp/vscode-sailpoint-identitynow?tab=readme-ov-file#roles membershipCriteria for format details. Name template Velocity rules apply."
+                                            "helpKey": "Membership criteria for automatic role assignment using Velocity template syntax. Can reference identity attributes and use logical operators. See https://github.com/yannick-beot-sp/vscode-sailpoint-identitynow?tab=readme-ov-file#roles for detailed format and examples. Context variables: $name (role name). Use $entitlement if not grouping or $entitlements if grouping."
                                         }
                                     ]
                                 }
@@ -329,19 +444,63 @@
     },
     "entitlementSchemas": [
         {
-            "type": "group",
+            "type": "entitlement",
             "identityAttribute": "id",
             "displayAttribute": "name",
             "attributes": [
                 {
                     "name": "id",
                     "type": "string",
-                    "description": "Account type ID"
+                    "description": "ID"
                 },
                 {
                     "name": "name",
                     "type": "string",
-                    "description": "Account type name"
+                    "description": "Name"
+                },
+                {
+                    "name": "description",
+                    "type": "string",
+                    "description": "Description"
+                }
+            ]
+        },
+        {
+            "type": "accessProfile",
+            "identityAttribute": "id",
+            "displayAttribute": "name",
+            "attributes": [
+                {
+                    "name": "id",
+                    "type": "string",
+                    "description": "ID"
+                },
+                {
+                    "name": "name",
+                    "type": "string",
+                    "description": "Name"
+                },
+                {
+                    "name": "description",
+                    "type": "string",
+                    "description": "Description"
+                }
+            ]
+        },
+        {
+            "type": "role",
+            "identityAttribute": "id",
+            "displayAttribute": "name",
+            "attributes": [
+                {
+                    "name": "id",
+                    "type": "string",
+                    "description": "ID"
+                },
+                {
+                    "name": "name",
+                    "type": "string",
+                    "description": "Name"
                 },
                 {
                     "name": "description",
