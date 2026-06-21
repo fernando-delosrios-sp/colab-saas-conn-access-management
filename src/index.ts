@@ -61,6 +61,8 @@ export const connector = async () => {
                 const entitlementMap = new Map<string, EntitlementV2025[]>()
                 const existingAccessProfileMap = new Map<string, AccessProfileV2025>()
                 const existingAppMap = new Map<string, SourceAppV2025>()
+                // ⚡ Bolt: Cache source owners to avoid N+1 API calls for identical source IDs
+                const sourceOwnerMap = new Map<string, string>()
                 // Process each definition
                 accessProfiles: for (const definition of config.accessProfiles) {
                     logger.debug(`Processing definition: ${definition.name}`)
@@ -129,7 +131,14 @@ export const connector = async () => {
                             logger.debug(`Processing entitlement in group: ${entitlement.name}`)
                             const entitlementRef = entitlementToRef(entitlement)
                             sourceId = entitlement.source!.id!
-                            ownerId = ownerId ?? (await isc.getSource(sourceId)).owner!.id!
+                            if (!ownerId) {
+                                if (sourceOwnerMap.has(sourceId)) {
+                                    ownerId = sourceOwnerMap.get(sourceId)!
+                                } else {
+                                    ownerId = (await isc.getSource(sourceId)).owner!.id!
+                                    sourceOwnerMap.set(sourceId, ownerId)
+                                }
+                            }
                             const appName = definition.groupType === 'accessProfile' ? definition.name : groupName
                             if (definition.createApplication) {
                                 if (!applicationMap.has(appName)) {
@@ -355,6 +364,14 @@ export const connector = async () => {
                 // Process each definition
                 roles: for (const definition of config.roles) {
                     logger.debug(`Processing definition: ${definition.name}`)
+
+                    // ⚡ Bolt: Hoist stringToMembership parsing outside the inner entitlement group loop
+                    // to prevent redundant AST parsing for the same assignment definition.
+                    let roleMembership: any = undefined
+                    if (definition.assignmentDefinition) {
+                        roleMembership = await stringToMembership(definition.assignmentDefinition, sources)
+                    }
+
                     const entitlements = await isc.listEntitlements(definition.query)
                     logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
                     // Get entitlements, access profiles, and applications from each entitlement found
@@ -414,12 +431,8 @@ export const connector = async () => {
                                     }
                                 }
 
-                                if (definition.assignmentDefinition) {
-                                    const membership = await stringToMembership(
-                                        definition.assignmentDefinition,
-                                        sources
-                                    )
-                                    roleProperties.membership = membership
+                                if (roleMembership) {
+                                    roleProperties.membership = roleMembership
                                 }
 
                                 logger.debug(`Checking for existing role: ${name}`)
