@@ -36,6 +36,7 @@ import axiosRetry from 'axios-retry'
 import { TOKEN_URL_PATH } from './data/constants'
 import { Config } from './model/config'
 import { retriesConfig } from './axios'
+import { escapeFilterString } from './utils/index'
 
 export class ISCClient {
     private config: Configuration
@@ -80,7 +81,7 @@ export class ISCClient {
 
     async getAccessProfileByName(name: string): Promise<AccessProfileV2025 | undefined> {
         const api = new AccessProfilesV2025Api(this.config)
-        const filters = `name eq "${name}"`
+        const filters = `name eq "${escapeFilterString(name)}"`
         const requestParameters: AccessProfilesV2025ApiListAccessProfilesRequest = {
             filters,
         }
@@ -90,7 +91,7 @@ export class ISCClient {
 
     async getRoleByName(name: string): Promise<RoleV2025 | undefined> {
         const api = new RolesV2025Api(this.config)
-        const filters = `name eq "${name}"`
+        const filters = `name eq "${escapeFilterString(name)}"`
         const requestParameters: RolesV2025ApiListRolesRequest = {
             filters,
         }
@@ -100,7 +101,7 @@ export class ISCClient {
 
     async getAppByName(name: string): Promise<SourceAppV2025 | undefined> {
         const api = new AppsV2025Api(this.config)
-        const filters = `name eq "${name}"`
+        const filters = `name eq "${escapeFilterString(name)}"`
         const requestParameters: AppsV2025ApiListAllSourceAppRequest = {
             filters,
         }
