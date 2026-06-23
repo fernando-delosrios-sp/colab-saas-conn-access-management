@@ -22,6 +22,7 @@ import {
     areStringArraysEqual,
     buildName,
     entitlementToRef,
+    getErrorMessage,
     normalizeAttributes,
     stringToMembership,
 } from './utils'
@@ -42,8 +43,8 @@ export const connector = async () => {
             await isc.getPublicIdentityConfig()
             res.send({})
         } catch (error) {
-            logger.error(error)
-            throw new ConnectorError(error as string)
+            logger.error(getErrorMessage(error))
+            throw new ConnectorError(getErrorMessage(error))
         }
     }
 
@@ -241,7 +242,7 @@ export const connector = async () => {
                             logger.debug(`Updating existing access profile: ${apName}`)
                             accessProfile = await isc.updateAccessProfile(id, accessProfileUpdate)
                         } catch (error) {
-                            logger.error(`Error updating access profile: ${error}`)
+                            logger.error(`Error updating access profile: ${getErrorMessage(error)}`)
                             continue
                         }
                     } else {
@@ -257,7 +258,7 @@ export const connector = async () => {
                             )
                             ap.id = accessProfile.id!
                         } catch (error) {
-                            logger.error(`Error creating access profile: ${error}`)
+                            logger.error(`Error creating access profile: ${getErrorMessage(error)}`)
                             continue
                         }
                     }
@@ -277,7 +278,7 @@ export const connector = async () => {
                             const newApp = await isc.createApp(appName, sourceId)
                             app.appId = newApp.id
                         } catch (error) {
-                            logger.error(`Error creating app: ${error}`)
+                            logger.error(`Error creating app: ${getErrorMessage(error)}`)
                             continue
                         }
                     }
@@ -336,7 +337,7 @@ export const connector = async () => {
                     try {
                         const updatedApp = await isc.updateSourceAccessProfiles(app.appId!, updateApplication)
                     } catch (error) {
-                        logger.error(`Error updating app: ${error}`)
+                        logger.error(`Error updating app: ${getErrorMessage(error)}`)
                         continue
                     }
                 }
@@ -510,7 +511,7 @@ export const connector = async () => {
                             logger.debug(`Updating existing role: ${roleName}`)
                             rolePayload = await isc.updateRole(id, roleUpdate)
                         } catch (error) {
-                            logger.error(`Error updating role: ${error}`)
+                            logger.error(`Error updating role: ${getErrorMessage(error)}`)
                             continue
                         }
                     } else {
@@ -525,7 +526,7 @@ export const connector = async () => {
                                 membership
                             )
                         } catch (error) {
-                            logger.error(`Error creating role: ${error}`)
+                            logger.error(`Error creating role: ${getErrorMessage(error)}`)
                             continue
                         }
                         role.id = rolePayload.id!
@@ -533,8 +534,8 @@ export const connector = async () => {
                 }
             }
         } catch (error) {
-            logger.error(error)
-            throw new ConnectorError(error as string)
+            logger.error(getErrorMessage(error))
+            throw new ConnectorError(getErrorMessage(error))
         } finally {
             clearInterval(interval)
         }
