@@ -80,4 +80,9 @@ export const getErrorMessage = (error: unknown): string => {
     return 'An unknown error occurred'
 }
 
+export const escapeFilterString = (value: string): string => {
+    if (!value) return value
+    return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
 export { stringToMembership }
