@@ -42,6 +42,15 @@ export class ISCClient {
     private config: Configuration
 
     constructor(config: Config) {
+        // Security enhancement: Validate config to prevent misconfiguration
+        // and ensure secure transmission of credentials over HTTPS
+        if (!config.baseurl?.startsWith('https://') && !config.baseurl?.startsWith('http://localhost') && !config.baseurl?.startsWith('http://127.0.0.1')) {
+            throw new Error('Security Error: baseurl must use https:// to prevent unencrypted transmission of credentials')
+        }
+        if (!config.clientId || !config.clientSecret) {
+            throw new Error('Security Error: Missing required authentication credentials in configuration')
+        }
+
         const conf: ConfigurationParameters = {
             baseurl: config.baseurl,
             clientId: config.clientId,
