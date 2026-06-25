@@ -59,13 +59,14 @@ export const connector = async () => {
                 logger.debug(`Processing ${config.accessProfiles.length} accessProfiles`)
                 const applicationMap = new Map<string, ApplicationProperties>()
                 const accessProfileMap = new Map<string, AccessProfileProperties>()
-                const entitlementMap = new Map<string, EntitlementV2025[]>()
                 const existingAccessProfileMap = new Map<string, AccessProfileV2025>()
                 const existingAppMap = new Map<string, SourceAppV2025>()
                 // ⚡ Bolt: Cache source owners to avoid N+1 API calls for identical source IDs
                 const sourceOwnerMap = new Map<string, string>()
                 // Process each definition
                 accessProfiles: for (const definition of config.accessProfiles) {
+                    // ⚡ Bolt: Scope entitlementMap to definition loop to avoid O(n²) redundant re-processing
+                    const entitlementMap = new Map<string, EntitlementV2025[]>()
                     logger.debug(`Processing definition: ${definition.name}`)
                     const entitlements = await isc.listEntitlements(definition.query)
                     logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
@@ -347,7 +348,6 @@ export const connector = async () => {
             if (config.roles) {
                 logger.debug(`Processing ${config.roles.length} roles`)
                 const roleMap = new Map<string, RoleProperties>()
-                const entitlementMap = new Map<string, EntitlementV2025[]>()
                 const existingRoleMap = new Map<string, RoleV2025>()
 
                 const sources = await isc.listSources()
@@ -364,6 +364,8 @@ export const connector = async () => {
 
                 // Process each definition
                 roles: for (const definition of config.roles) {
+                    // ⚡ Bolt: Scope entitlementMap to definition loop to avoid O(n²) redundant re-processing
+                    const entitlementMap = new Map<string, EntitlementV2025[]>()
                     logger.debug(`Processing definition: ${definition.name}`)
 
                     // ⚡ Bolt: Hoist stringToMembership parsing outside the inner entitlement group loop
