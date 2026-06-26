@@ -36,7 +36,7 @@ export const retriesConfig: IAxiosRetryConfig = {
         const delayType = error.response?.headers?.['retry-after'] ? 'server-specified' : 'exponential backoff'
 
         logger.warn(
-            `Request to [${requestConfig.url}] failed with status [${status}]. ` +
+            `Request to [${requestConfig.url?.split('?')[0]}] failed with status [${status}]. ` +
                 `Waiting ${delay}s (${delayType}) before retry attempt ${retryCount}/${RETRIES}`
         )
     },

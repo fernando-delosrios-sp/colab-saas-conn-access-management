@@ -10,6 +10,16 @@
 **Learning:** Directly interpolating unescaped user strings into query structures or API filter parameters leads to injection vulnerabilities, allowing attackers to manipulate queries.
 **Prevention:** Always escape user input (like double quotes `"` and backslashes `\`) before injecting it into string-based query filters. Create an escaping utility function (`escapeFilterString`) and apply it consistently.
 
+## 2025-06-26 - Logged URLs in axios retry exposure fix
+
+**Vulnerability:**
+The `src/axios.ts` file logged the full `requestConfig.url` when an axios request failed and triggered a retry. This full URL could contain sensitive query parameters (such as access tokens, secrets, or PII) which would be exposed in plain text in the connector logs.
+
+**Learning:**
+Logging request URLs during failure cases without redacting query strings can lead to credential or data leaks. It's crucial to always strip or mask query parameters when logging URLs.
+
+**Prevention:**
+Parse or split the URL and only log the base URL path (e.g., `url?.split('?')[0]`).
 ## 2024-06-26 - Server-Side Template Injection via Velocity Templates
 
 **Vulnerability:**
