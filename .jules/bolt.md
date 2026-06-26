@@ -7,6 +7,7 @@
 
 **Learning:** In loops processing thousands of items (like entitlements), parsing and compiling template strings (like `velocityjs`) on every iteration creates a significant bottleneck.
 **Action:** Introduced a module-level `Map` cache to memoize the compiled velocity AST by template string, drastically reducing rendering overhead for repeated templates.
+
 ## 2026-06-26 - Concurrent Access Profile, Application, and Role Provisioning
 
 **Learning:** When performing mass object creation or updates across external APIs in a `for...of` loop, awaiting each API call sequentially can cause significant performance bottlenecks due to network I/O blockages.
@@ -16,7 +17,13 @@
 
 **Learning:** Unbounded sequential API calls within loops (e.g. `getAccessProfileByName` or `getRoleByName` during entitlement mapping) cause significant N+1 blockages and slow down evaluation phases. However, when refactoring to `Promise.all` across arrays of unknown sizes, there's a risk of socket exhaustion or rate limits.
 **Action:** Always prefer grouped concurrent batching (or at least executing over deduplicated maps) for lookup API requests to remove sequential wait times, but consider concurrency limits when API arrays could be large to avoid HTTP 429s or timeouts.
+
 ## 2024-06-23 - Scope Aggregation Maps Inside Iteration Loops
 
 **Learning:** When aggregating nested data entities across an array of definitions (like assigning entitlements to roles or access profiles based on a configuration block), initializing the aggregation container (e.g. `entitlementMap`) outside the definition loop caused memory leaking and exponential redundant processing overhead in subsequent loop iterations.
 **Action:** Always restrict the lexical scope of accumulator Maps/Sets to the tightest loop block containing the processing context. Re-initialize them inside the loop to avoid dragging prior state into the next configuration evaluation unless the state explicitly needs to cross iterations.
+
+## 2024-11-20 - N+1 Pre-fetching in Processing Loops
+
+**Learning:** When retrieving related items inside an aggregation loop (such as fetching `app` and `source` dependencies while iterating over grouped entitlements), executing sequential `await` operations inside nested loops causes a severe N+1 latency bottleneck.
+**Action:** Extract the required unique identifiers into `Set`s before the primary iteration begins, pre-fetch the dependencies concurrently using `Promise.all`, and store the results in temporary lookup maps to perform instant retrieval during the actual loop iteration.

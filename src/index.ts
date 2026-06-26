@@ -123,7 +123,37 @@ export const connector = async () => {
                             entitlementMap.get(definition.name)?.push(entitlement)
                         }
                     }
-                    groups: for (const groupName of entitlementMap.keys()) {
+                    // ⚡ Bolt: Pre-fetch missing sources and applications concurrently to avoid N+1 queries
+                    const missingSources = new Set<string>()
+                    const missingApps = new Set<string>()
+                    for (const groupName of Array.from(entitlementMap.keys())) {
+                        const appName = definition.groupType === 'accessProfile' ? definition.name : groupName
+                        for (const entitlement of entitlementMap.get(groupName)!) {
+                            const sId = entitlement.source!.id!
+                            if (!sourceOwnerMap.has(sId)) {
+                                missingSources.add(sId)
+                            }
+                            if (definition.createApplication && !applicationMap.has(appName)) {
+                                missingApps.add(appName)
+                            }
+                        }
+                    }
+
+                    if (missingSources.size > 0) {
+                        logger.debug(`Pre-fetching ${missingSources.size} missing sources concurrently`)
+                        const sources = await Promise.all(Array.from(missingSources).map((id) => isc.getSource(id)))
+                        sources.forEach((source) => sourceOwnerMap.set(source.id!, source.owner!.id!))
+                    }
+
+                    const prefetchedApps = new Map<string, SourceAppV2025 | undefined>()
+                    if (missingApps.size > 0) {
+                        logger.debug(`Pre-fetching ${missingApps.size} missing apps concurrently`)
+                        const appNames = Array.from(missingApps)
+                        const apps = await Promise.all(appNames.map((name) => isc.getAppByName(name)))
+                        apps.forEach((app, index) => prefetchedApps.set(appNames[index], app))
+                    }
+
+                    groups: for (const groupName of Array.from(entitlementMap.keys())) {
                         logger.debug(`Processing group: ${groupName}`)
                         let sourceId: string
                         let ownerId: string | undefined
@@ -134,18 +164,13 @@ export const connector = async () => {
                             const entitlementRef = entitlementToRef(entitlement)
                             sourceId = entitlement.source!.id!
                             if (!ownerId) {
-                                if (sourceOwnerMap.has(sourceId)) {
-                                    ownerId = sourceOwnerMap.get(sourceId)!
-                                } else {
-                                    ownerId = (await isc.getSource(sourceId)).owner!.id!
-                                    sourceOwnerMap.set(sourceId, ownerId)
-                                }
+                                ownerId = sourceOwnerMap.get(sourceId)!
                             }
                             const appName = definition.groupType === 'accessProfile' ? definition.name : groupName
                             if (definition.createApplication) {
                                 if (!applicationMap.has(appName)) {
                                     logger.debug(`Looking up app: ${appName}`)
-                                    app = await isc.getAppByName(appName)
+                                    app = prefetchedApps.get(appName)
                                     if (app) {
                                         if (app.accountSource?.id !== sourceId) {
                                             logger.error(
@@ -421,7 +446,7 @@ export const connector = async () => {
                             entitlementMap.get(definition.name)?.push(entitlement)
                         }
                     }
-                    groups: for (const groupName of entitlementMap.keys()) {
+                    groups: for (const groupName of Array.from(entitlementMap.keys())) {
                         logger.debug(`Processing group: ${groupName}`)
                         let ownerId: string | undefined
 
