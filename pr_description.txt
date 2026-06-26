@@ -1,5 +1,0 @@
-🧪 Add tests for `normalizeAttributes` utility
-
-🎯 **What:** The `normalizeAttributes` utility in `src/utils/index.ts` was missing tests. Installed jest testing framework.
-📊 **Coverage:** Covered happy paths (basic entitlement object) and edge cases like missing attributes, undefined source, undefined `_group`, and ensuring existing attributes are not unexpectedly overwritten.
-✨ **Result:** Increased test coverage for basic object manipulation and logic handling inside `normalizeAttributes`, improving reliability.
