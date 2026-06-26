@@ -7,6 +7,10 @@
 
 **Learning:** In loops processing thousands of items (like entitlements), parsing and compiling template strings (like `velocityjs`) on every iteration creates a significant bottleneck.
 **Action:** Introduced a module-level `Map` cache to memoize the compiled velocity AST by template string, drastically reducing rendering overhead for repeated templates.
+## 2026-06-26 - Concurrent Access Profile, Application, and Role Provisioning
+
+**Learning:** When performing mass object creation or updates across external APIs in a `for...of` loop, awaiting each API call sequentially can cause significant performance bottlenecks due to network I/O blockages.
+**Action:** Transformed sequential `for...of` loops into concurrent execution paths utilizing `Promise.all(Array.from(map.entries()).map(async ([key, val]) => {...}))`. This dramatically decreases execution time by parallelizing network operations while maintaining single-threaded safety for subsequent application-level state updates.
 
 ## 2026-06-24 - Batching API Lookups for Performance
 
