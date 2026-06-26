@@ -12,8 +12,7 @@ export const retriesConfig: IAxiosRetryConfig = {
     retryDelay: (retryCount, error) => {
         // Check if response and headers exist before accessing retry-after
         if (error.response?.headers) {
-            type NewType = AxiosResponseHeaders
-            const headers = error.response.headers as NewType
+            const headers = error.response.headers as AxiosResponseHeaders
             const retryAfter = headers.get('retry-after')
 
             if (retryAfter) {

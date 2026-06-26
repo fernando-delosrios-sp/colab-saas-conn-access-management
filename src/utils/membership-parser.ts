@@ -133,10 +133,7 @@ class Literal implements Expression {
 }
 
 class LogicalOperator implements Expression {
-    constructor(
-        public readonly operation: LogicalOperation,
-        public readonly children: Expression[]
-    ) {}
+    constructor(public readonly operation: LogicalOperation, public readonly children: Expression[]) {}
 
     public async accept<T>(v: Visitor<T>, arg: T) {
         await v.visitLogicalOperator(this, arg)
