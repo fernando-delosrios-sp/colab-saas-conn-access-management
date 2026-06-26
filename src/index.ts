@@ -197,150 +197,157 @@ export const connector = async () => {
                 }
 
                 // Create/update access profiles
-                for (const [apName, ap] of accessProfileMap.entries()) {
-                    const { id, appName, ownerId, sourceId, entitlements, requestable, accessRequestConfig } = ap
-                    let accessProfile: AccessProfileV2025
-                    if (id) {
-                        logger.debug(`Evaluating existing access profile for update: ${apName}`)
-                        const existingAp = existingAccessProfileMap.get(apName)
-                        const accessProfileUpdate: JsonPatchOperationV2025[] = [
+                await Promise.all(
+                    Array.from(accessProfileMap.entries()).map(async ([apName, ap]) => {
+                        const { id, appName, ownerId, sourceId, entitlements, requestable, accessRequestConfig } = ap
+                        let accessProfile: AccessProfileV2025
+                        if (id) {
+                            logger.debug(`Evaluating existing access profile for update: ${apName}`)
+                            const existingAp = existingAccessProfileMap.get(apName)
+                            const accessProfileUpdate: JsonPatchOperationV2025[] = [
+                                {
+                                    op: 'replace',
+                                    path: '/entitlements',
+                                    value: entitlements,
+                                },
+                            ]
+                            if (requestable) {
+                                accessProfileUpdate.push({
+                                    op: 'replace',
+                                    path: '/requestable',
+                                    value: true,
+                                })
+                            }
+                            if (accessRequestConfig) {
+                                accessProfileUpdate.push({
+                                    op: 'replace',
+                                    path: '/accessRequestConfig',
+                                    value: accessRequestConfig,
+                                })
+                            }
+
+                            if (existingAp) {
+                                const entitlementsChanged = !areEntitlementRefsEqual(
+                                    existingAp.entitlements,
+                                    entitlements
+                                )
+                                const requestableChanged = requestable ? existingAp.requestable !== true : false
+                                const accessRequestConfigChanged = accessRequestConfig
+                                    ? !areJsonEqual(existingAp.accessRequestConfig, accessRequestConfig)
+                                    : false
+
+                                if (!entitlementsChanged && !requestableChanged && !accessRequestConfigChanged) {
+                                    logger.debug(`No changes detected for access profile ${apName}, skipping update`)
+                                    return
+                                }
+                            }
+
+                            try {
+                                logger.debug(`Updating existing access profile: ${apName}`)
+                                accessProfile = await isc.updateAccessProfile(id, accessProfileUpdate)
+                            } catch (error) {
+                                logger.error(`Error updating access profile: ${getErrorMessage(error)}`)
+                                return
+                            }
+                        } else {
+                            logger.debug(`Creating new access profile: ${apName}`)
+                            try {
+                                accessProfile = await isc.createAccessProfile(
+                                    apName,
+                                    ownerId,
+                                    sourceId,
+                                    entitlements,
+                                    requestable,
+                                    accessRequestConfig
+                                )
+                                ap.id = accessProfile.id!
+                            } catch (error) {
+                                logger.error(`Error creating access profile: ${getErrorMessage(error)}`)
+                                return
+                            }
+                        }
+                        const app = applicationMap.get(appName)
+                        if (app) {
+                            app.accessProfiles.push(ap.id!)
+                        }
+                    })
+                )
+
+                // Create/update applications
+                await Promise.all(
+                    Array.from(applicationMap.entries()).map(async ([appName, app]) => {
+                        const { appId, sourceId, accessProfiles } = app
+                        const existingApp = existingAppMap.get(appName)
+                        if (!appId) {
+                            logger.debug(`Creating new app: ${appName}`)
+                            try {
+                                const newApp = await isc.createApp(appName, sourceId)
+                                app.appId = newApp.id
+                            } catch (error) {
+                                logger.error(`Error creating app: ${getErrorMessage(error)}`)
+                                return
+                            }
+                        }
+
+                        logger.debug(`Evaluating application ${appName} for update`)
+                        const updateApplication: JsonPatchOperationV2025[] = [
                             {
                                 op: 'replace',
-                                path: '/entitlements',
-                                value: entitlements,
+                                path: '/accessProfiles',
+                                value: accessProfiles,
+                            },
+                            {
+                                op: 'replace',
+                                path: '/enabled',
+                                value: true,
+                            },
+                            {
+                                op: 'replace',
+                                path: '/appCenterEnabled',
+                                value: true,
+                            },
+                            {
+                                op: 'replace',
+                                path: '/provisionRequestEnabled',
+                                value: true,
+                            },
+                            {
+                                op: 'replace',
+                                path: '/matchAllAccounts',
+                                value: false,
                             },
                         ]
-                        if (requestable) {
-                            accessProfileUpdate.push({
-                                op: 'replace',
-                                path: '/requestable',
-                                value: true,
-                            })
-                        }
-                        if (accessRequestConfig) {
-                            accessProfileUpdate.push({
-                                op: 'replace',
-                                path: '/accessRequestConfig',
-                                value: accessRequestConfig,
-                            })
-                        }
 
-                        if (existingAp) {
-                            const entitlementsChanged = !areEntitlementRefsEqual(existingAp.entitlements, entitlements)
-                            const requestableChanged = requestable ? existingAp.requestable !== true : false
-                            const accessRequestConfigChanged = accessRequestConfig
-                                ? !areJsonEqual(existingAp.accessRequestConfig, accessRequestConfig)
-                                : false
+                        if (existingApp) {
+                            const accessProfilesChanged = !areStringArraysEqual(
+                                (existingApp as any).accessProfiles,
+                                accessProfiles
+                            )
+                            const enabledChanged = existingApp.enabled !== true
+                            const appCenterEnabledChanged = existingApp.appCenterEnabled !== true
+                            const provisionRequestEnabledChanged = existingApp.provisionRequestEnabled !== true
+                            const matchAllAccountsChanged = existingApp.matchAllAccounts !== false
 
-                            if (!entitlementsChanged && !requestableChanged && !accessRequestConfigChanged) {
-                                logger.debug(`No changes detected for access profile ${apName}, skipping update`)
-                                continue
+                            if (
+                                !accessProfilesChanged &&
+                                !enabledChanged &&
+                                !appCenterEnabledChanged &&
+                                !provisionRequestEnabledChanged &&
+                                !matchAllAccountsChanged
+                            ) {
+                                logger.debug(`No changes detected for app ${appName}, skipping update`)
+                                return
                             }
                         }
 
                         try {
-                            logger.debug(`Updating existing access profile: ${apName}`)
-                            accessProfile = await isc.updateAccessProfile(id, accessProfileUpdate)
+                            const updatedApp = await isc.updateSourceAccessProfiles(app.appId!, updateApplication)
                         } catch (error) {
-                            logger.error(`Error updating access profile: ${getErrorMessage(error)}`)
-                            continue
+                            logger.error(`Error updating app: ${getErrorMessage(error)}`)
+                            return
                         }
-                    } else {
-                        logger.debug(`Creating new access profile: ${apName}`)
-                        try {
-                            accessProfile = await isc.createAccessProfile(
-                                apName,
-                                ownerId,
-                                sourceId,
-                                entitlements,
-                                requestable,
-                                accessRequestConfig
-                            )
-                            ap.id = accessProfile.id!
-                        } catch (error) {
-                            logger.error(`Error creating access profile: ${getErrorMessage(error)}`)
-                            continue
-                        }
-                    }
-                    const app = applicationMap.get(appName)
-                    if (app) {
-                        app.accessProfiles.push(ap.id!)
-                    }
-                }
-
-                // Create/update applications
-                for (const [appName, app] of applicationMap.entries()) {
-                    const { appId, sourceId, accessProfiles } = app
-                    const existingApp = existingAppMap.get(appName)
-                    if (!appId) {
-                        logger.debug(`Creating new app: ${appName}`)
-                        try {
-                            const newApp = await isc.createApp(appName, sourceId)
-                            app.appId = newApp.id
-                        } catch (error) {
-                            logger.error(`Error creating app: ${getErrorMessage(error)}`)
-                            continue
-                        }
-                    }
-
-                    logger.debug(`Evaluating application ${appName} for update`)
-                    const updateApplication: JsonPatchOperationV2025[] = [
-                        {
-                            op: 'replace',
-                            path: '/accessProfiles',
-                            value: accessProfiles,
-                        },
-                        {
-                            op: 'replace',
-                            path: '/enabled',
-                            value: true,
-                        },
-                        {
-                            op: 'replace',
-                            path: '/appCenterEnabled',
-                            value: true,
-                        },
-                        {
-                            op: 'replace',
-                            path: '/provisionRequestEnabled',
-                            value: true,
-                        },
-                        {
-                            op: 'replace',
-                            path: '/matchAllAccounts',
-                            value: false,
-                        },
-                    ]
-
-                    if (existingApp) {
-                        const accessProfilesChanged = !areStringArraysEqual(
-                            (existingApp as any).accessProfiles,
-                            accessProfiles
-                        )
-                        const enabledChanged = existingApp.enabled !== true
-                        const appCenterEnabledChanged = existingApp.appCenterEnabled !== true
-                        const provisionRequestEnabledChanged = existingApp.provisionRequestEnabled !== true
-                        const matchAllAccountsChanged = existingApp.matchAllAccounts !== false
-
-                        if (
-                            !accessProfilesChanged &&
-                            !enabledChanged &&
-                            !appCenterEnabledChanged &&
-                            !provisionRequestEnabledChanged &&
-                            !matchAllAccountsChanged
-                        ) {
-                            logger.debug(`No changes detected for app ${appName}, skipping update`)
-                            continue
-                        }
-                    }
-
-                    try {
-                        const updatedApp = await isc.updateSourceAccessProfiles(app.appId!, updateApplication)
-                    } catch (error) {
-                        logger.error(`Error updating app: ${getErrorMessage(error)}`)
-                        continue
-                    }
-                }
+                    })
+                )
             }
 
             // Roles
@@ -449,89 +456,91 @@ export const connector = async () => {
                 }
 
                 // Create/update roles
-                for (const [roleName, role] of roleMap.entries()) {
-                    const { id, ownerId, entitlements, requestable, accessRequestConfig, membership } = role
-                    let rolePayload: RoleV2025
-                    if (id) {
-                        logger.debug(`Evaluating existing role for update: ${roleName}`)
-                        const existingRole = existingRoleMap.get(roleName)
-                        const roleUpdate: JsonPatchOperationV2025[] = [
-                            {
-                                op: 'replace',
-                                path: '/entitlements',
-                                value: entitlements,
-                            },
-                        ]
-                        if (requestable) {
-                            roleUpdate.push({
-                                op: 'replace',
-                                path: '/requestable',
-                                value: true,
-                            })
-                        }
-                        if (accessRequestConfig) {
-                            roleUpdate.push({
-                                op: 'replace',
-                                path: '/accessRequestConfig',
-                                value: accessRequestConfig,
-                            })
-                        }
-                        if (membership) {
-                            roleUpdate.push({
-                                op: 'replace',
-                                path: '/membership',
-                                value: membership,
-                            })
-                        }
-
-                        if (existingRole) {
-                            const entitlementsChanged = !areEntitlementRefsEqual(
-                                existingRole.entitlements,
-                                entitlements
-                            )
-                            const requestableChanged = requestable ? existingRole.requestable !== true : false
-                            const accessRequestConfigChanged = accessRequestConfig
-                                ? !areJsonEqual(existingRole.accessRequestConfig, accessRequestConfig)
-                                : false
-                            const membershipChanged = membership
-                                ? !areJsonEqual(existingRole.membership, membership)
-                                : false
-
-                            if (
-                                !entitlementsChanged &&
-                                !requestableChanged &&
-                                !accessRequestConfigChanged &&
-                                !membershipChanged
-                            ) {
-                                logger.debug(`No changes detected for role ${roleName}, skipping update`)
-                                continue
+                await Promise.all(
+                    Array.from(roleMap.entries()).map(async ([roleName, role]) => {
+                        const { id, ownerId, entitlements, requestable, accessRequestConfig, membership } = role
+                        let rolePayload: RoleV2025
+                        if (id) {
+                            logger.debug(`Evaluating existing role for update: ${roleName}`)
+                            const existingRole = existingRoleMap.get(roleName)
+                            const roleUpdate: JsonPatchOperationV2025[] = [
+                                {
+                                    op: 'replace',
+                                    path: '/entitlements',
+                                    value: entitlements,
+                                },
+                            ]
+                            if (requestable) {
+                                roleUpdate.push({
+                                    op: 'replace',
+                                    path: '/requestable',
+                                    value: true,
+                                })
                             }
+                            if (accessRequestConfig) {
+                                roleUpdate.push({
+                                    op: 'replace',
+                                    path: '/accessRequestConfig',
+                                    value: accessRequestConfig,
+                                })
+                            }
+                            if (membership) {
+                                roleUpdate.push({
+                                    op: 'replace',
+                                    path: '/membership',
+                                    value: membership,
+                                })
+                            }
+
+                            if (existingRole) {
+                                const entitlementsChanged = !areEntitlementRefsEqual(
+                                    existingRole.entitlements,
+                                    entitlements
+                                )
+                                const requestableChanged = requestable ? existingRole.requestable !== true : false
+                                const accessRequestConfigChanged = accessRequestConfig
+                                    ? !areJsonEqual(existingRole.accessRequestConfig, accessRequestConfig)
+                                    : false
+                                const membershipChanged = membership
+                                    ? !areJsonEqual(existingRole.membership, membership)
+                                    : false
+
+                                if (
+                                    !entitlementsChanged &&
+                                    !requestableChanged &&
+                                    !accessRequestConfigChanged &&
+                                    !membershipChanged
+                                ) {
+                                    logger.debug(`No changes detected for role ${roleName}, skipping update`)
+                                    return
+                                }
+                            }
+                            try {
+                                logger.debug(`Updating existing role: ${roleName}`)
+                                rolePayload = await isc.updateRole(id, roleUpdate)
+                            } catch (error) {
+                                logger.error(`Error updating role: ${getErrorMessage(error)}`)
+                                return
+                            }
+                        } else {
+                            logger.debug(`Creating new role: ${roleName}`)
+                            try {
+                                rolePayload = await isc.createRole(
+                                    roleName,
+                                    ownerId,
+                                    entitlements,
+                                    requestable,
+                                    accessRequestConfig,
+                                    membership
+                                )
+                            } catch (error) {
+                                logger.error(`Error creating role: ${getErrorMessage(error)}`)
+                                return
+                            }
+                            role.id = rolePayload.id!
                         }
-                        try {
-                            logger.debug(`Updating existing role: ${roleName}`)
-                            rolePayload = await isc.updateRole(id, roleUpdate)
-                        } catch (error) {
-                            logger.error(`Error updating role: ${getErrorMessage(error)}`)
-                            continue
-                        }
-                    } else {
-                        logger.debug(`Creating new role: ${roleName}`)
-                        try {
-                            rolePayload = await isc.createRole(
-                                roleName,
-                                ownerId,
-                                entitlements,
-                                requestable,
-                                accessRequestConfig,
-                                membership
-                            )
-                        } catch (error) {
-                            logger.error(`Error creating role: ${getErrorMessage(error)}`)
-                            continue
-                        }
-                        role.id = rolePayload.id!
-                    }
-                }
+                    })
+                )
             }
         } catch (error) {
             logger.error(getErrorMessage(error))
