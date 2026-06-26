@@ -1,7 +1,10 @@
 {
     "name": "Access Management",
     "description": "Access Management Connector for automated application, access profile and role management",
-    "commands": ["std:entitlement:list", "std:test-connection"],
+    "commands": [
+        "std:entitlement:list",
+        "std:test-connection"
+    ],
     "showDebugLoggingOption": true,
     "sourceConfigInitialValues": {
         "nameTemplate": "$name"

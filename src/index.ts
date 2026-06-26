@@ -415,7 +415,10 @@ export const connector = async () => {
 
                                 if (definition.assignmentDefinition) {
                                     const assignmentDefinition = buildName(entitlement, definition.assignmentDefinition)
-                                    const membership = await stringToMembership(assignmentDefinition, sources)
+                                    const membership = await stringToMembership(
+                                        assignmentDefinition,
+                                        sources
+                                    )
                                     roleProperties.membership = membership
                                 }
 
