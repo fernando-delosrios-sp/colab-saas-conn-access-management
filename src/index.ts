@@ -6,6 +6,7 @@ import {
     StdTestConnectionHandler,
     ConnectorError,
 } from '@sailpoint/connector-sdk'
+import velocityjs from 'velocityjs'
 import { ISCClient } from './isc-client'
 import { Config } from './model/config'
 import {
@@ -22,7 +23,6 @@ import {
     areStringArraysEqual,
     buildName,
     entitlementToRef,
-    getErrorMessage,
     normalizeAttributes,
     stringToMembership,
 } from './utils'
@@ -43,8 +43,8 @@ export const connector = async () => {
             await isc.getPublicIdentityConfig()
             res.send({})
         } catch (error) {
-            logger.error(getErrorMessage(error))
-            throw new ConnectorError(getErrorMessage(error))
+            logger.error(error)
+            throw new ConnectorError(error as string)
         }
     }
 
@@ -62,8 +62,6 @@ export const connector = async () => {
                 const entitlementMap = new Map<string, EntitlementV2025[]>()
                 const existingAccessProfileMap = new Map<string, AccessProfileV2025>()
                 const existingAppMap = new Map<string, SourceAppV2025>()
-                // ⚡ Bolt: Cache source owners to avoid N+1 API calls for identical source IDs
-                const sourceOwnerMap = new Map<string, string>()
                 // Process each definition
                 accessProfiles: for (const definition of config.accessProfiles) {
                     logger.debug(`Processing definition: ${definition.name}`)
@@ -132,14 +130,7 @@ export const connector = async () => {
                             logger.debug(`Processing entitlement in group: ${entitlement.name}`)
                             const entitlementRef = entitlementToRef(entitlement)
                             sourceId = entitlement.source!.id!
-                            if (!ownerId) {
-                                if (sourceOwnerMap.has(sourceId)) {
-                                    ownerId = sourceOwnerMap.get(sourceId)!
-                                } else {
-                                    ownerId = (await isc.getSource(sourceId)).owner!.id!
-                                    sourceOwnerMap.set(sourceId, ownerId)
-                                }
-                            }
+                            ownerId = ownerId ?? (await isc.getSource(sourceId)).owner!.id!
                             const appName = definition.groupType === 'accessProfile' ? definition.name : groupName
                             if (definition.createApplication) {
                                 if (!applicationMap.has(appName)) {
@@ -152,15 +143,15 @@ export const connector = async () => {
                                             )
                                             continue groups
                                         }
-                                        existingAppMap.set(app.name!, app)
-                                        applicationMap.set(app.name!, { appId: app.id!, sourceId, accessProfiles: [] })
+                                        existingAppMap.set(appName, app)
+                                        applicationMap.set(appName, { appId: app.id!, sourceId, accessProfiles: [] })
                                     } else {
                                         applicationMap.set(appName, { sourceId, accessProfiles: [] })
                                     }
                                 }
                             }
 
-                            const name = buildName(entitlement, definition)
+                            const name = buildName(entitlement, definition.nameTemplate)
                             logger.debug(`Preparing access profile: ${name}`)
                             let accessProfileProperties: AccessProfileProperties
                             if (accessProfileMap.has(name)) {
@@ -234,16 +225,15 @@ export const connector = async () => {
 
                             if (!entitlementsChanged && !requestableChanged && !accessRequestConfigChanged) {
                                 logger.debug(`No changes detected for access profile ${apName}, skipping update`)
-                                continue
+                            } else {
+                                try {
+                                    logger.debug(`Updating existing access profile: ${apName}`)
+                                    accessProfile = await isc.updateAccessProfile(id, accessProfileUpdate)
+                                } catch (error) {
+                                    logger.error(`Error updating access profile: ${error}`)
+                                    continue
+                                }
                             }
-                        }
-
-                        try {
-                            logger.debug(`Updating existing access profile: ${apName}`)
-                            accessProfile = await isc.updateAccessProfile(id, accessProfileUpdate)
-                        } catch (error) {
-                            logger.error(`Error updating access profile: ${getErrorMessage(error)}`)
-                            continue
                         }
                     } else {
                         logger.debug(`Creating new access profile: ${apName}`)
@@ -258,7 +248,7 @@ export const connector = async () => {
                             )
                             ap.id = accessProfile.id!
                         } catch (error) {
-                            logger.error(`Error creating access profile: ${getErrorMessage(error)}`)
+                            logger.error(`Error creating access profile: ${error}`)
                             continue
                         }
                     }
@@ -278,7 +268,7 @@ export const connector = async () => {
                             const newApp = await isc.createApp(appName, sourceId)
                             app.appId = newApp.id
                         } catch (error) {
-                            logger.error(`Error creating app: ${getErrorMessage(error)}`)
+                            logger.error(`Error creating app: ${error}`)
                             continue
                         }
                     }
@@ -330,14 +320,13 @@ export const connector = async () => {
                             !matchAllAccountsChanged
                         ) {
                             logger.debug(`No changes detected for app ${appName}, skipping update`)
-                            continue
                         }
                     }
 
                     try {
                         const updatedApp = await isc.updateSourceAccessProfiles(app.appId!, updateApplication)
                     } catch (error) {
-                        logger.error(`Error updating app: ${getErrorMessage(error)}`)
+                        logger.error(`Error updating app: ${error}`)
                         continue
                     }
                 }
@@ -365,14 +354,6 @@ export const connector = async () => {
                 // Process each definition
                 roles: for (const definition of config.roles) {
                     logger.debug(`Processing definition: ${definition.name}`)
-
-                    // ⚡ Bolt: Hoist stringToMembership parsing outside the inner entitlement group loop
-                    // to prevent redundant AST parsing for the same assignment definition.
-                    let roleMembership: any = undefined
-                    if (definition.assignmentDefinition) {
-                        roleMembership = await stringToMembership(definition.assignmentDefinition, sources)
-                    }
-
                     const entitlements = await isc.listEntitlements(definition.query)
                     logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
                     // Get entitlements, access profiles, and applications from each entitlement found
@@ -410,7 +391,7 @@ export const connector = async () => {
                             const entitlementRef = entitlementToRef(entitlement)
                             ownerId = source.owner!.id!
 
-                            const name = buildName(entitlement, definition)
+                            const name = buildName(entitlement, definition.nameTemplate)
                             logger.debug(`Preparing role: ${name}`)
                             let roleProperties: RoleProperties
                             if (roleMap.has(name)) {
@@ -432,8 +413,10 @@ export const connector = async () => {
                                     }
                                 }
 
-                                if (roleMembership) {
-                                    roleProperties.membership = roleMembership
+                                if (definition.assignmentDefinition) {
+                                    const assignmentDefinition = buildName(entitlement, definition.assignmentDefinition)
+                                    const membership = await stringToMembership(assignmentDefinition, sources)
+                                    roleProperties.membership = membership
                                 }
 
                                 logger.debug(`Checking for existing role: ${name}`)
@@ -504,15 +487,15 @@ export const connector = async () => {
                                 !membershipChanged
                             ) {
                                 logger.debug(`No changes detected for role ${roleName}, skipping update`)
-                                continue
+                            } else {
+                                try {
+                                    logger.debug(`Updating existing role: ${roleName}`)
+                                    rolePayload = await isc.updateRole(id, roleUpdate)
+                                } catch (error) {
+                                    logger.error(`Error updating role: ${error}`)
+                                    continue
+                                }
                             }
-                        }
-                        try {
-                            logger.debug(`Updating existing role: ${roleName}`)
-                            rolePayload = await isc.updateRole(id, roleUpdate)
-                        } catch (error) {
-                            logger.error(`Error updating role: ${getErrorMessage(error)}`)
-                            continue
                         }
                     } else {
                         logger.debug(`Creating new role: ${roleName}`)
@@ -526,7 +509,7 @@ export const connector = async () => {
                                 membership
                             )
                         } catch (error) {
-                            logger.error(`Error creating role: ${getErrorMessage(error)}`)
+                            logger.error(`Error creating role: ${error}`)
                             continue
                         }
                         role.id = rolePayload.id!
@@ -534,8 +517,8 @@ export const connector = async () => {
                 }
             }
         } catch (error) {
-            logger.error(getErrorMessage(error))
-            throw new ConnectorError(getErrorMessage(error))
+            logger.error(error)
+            throw new ConnectorError(error as string)
         } finally {
             clearInterval(interval)
         }

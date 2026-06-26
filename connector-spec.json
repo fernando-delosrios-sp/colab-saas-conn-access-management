@@ -287,8 +287,6 @@
                                             "key": "automaticAssignment",
                                             "label": "Automatic Assignment?",
                                             "type": "toggle",
-                                            "parentKey": "requestable",
-                                            "parentValue": "true",
                                             "helpKey": "Automatically assign role if criteria is met",
                                             "required": true
                                         },

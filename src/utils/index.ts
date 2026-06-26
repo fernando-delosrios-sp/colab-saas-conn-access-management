@@ -1,5 +1,4 @@
 import { EntitlementRefV2025, EntitlementV2025 } from 'sailpoint-api-client'
-import { Definition } from '../model/config'
 import velocityjs from 'velocityjs'
 import { stringToMembership } from './membership-parser'
 
@@ -15,19 +14,10 @@ export const normalizeAttributes = (entitlement: EntitlementV2025, _group: strin
     return { ...entitlement, attributes }
 }
 
-// ⚡ Bolt: Cache compiled velocity templates to avoid redundant parsing/compilation
-// for the same nameTemplate string across thousands of entitlements.
-// This reduces template rendering time by ~95% in large entitlement loops.
-const templateCache = new Map<string, any>()
+export const buildName = (entitlement: EntitlementV2025, template: string): string => {
+    const velocityTemplate = velocityjs.parse(template)
 
-export const buildName = (entitlement: EntitlementV2025, definition: Definition): string => {
-    let velocity = templateCache.get(definition.nameTemplate)
-    if (!velocity) {
-        const template = velocityjs.parse(definition.nameTemplate)
-        velocity = new velocityjs.Compile(template)
-        templateCache.set(definition.nameTemplate, velocity)
-    }
-
+    const velocity = new velocityjs.Compile(velocityTemplate)
     const name = velocity.render(entitlement.attributes)
 
     return name
@@ -67,22 +57,9 @@ export const areJsonEqual = (a: any, b: any): boolean => {
     return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
 }
 
-export const getErrorMessage = (error: unknown): string => {
-    if (error instanceof Error) {
-        return error.message
-    }
-    if (error && typeof error === 'object' && 'message' in error) {
-        return String((error as { message: unknown }).message)
-    }
-    if (typeof error === 'string') {
-        return error
-    }
-    return 'An unknown error occurred'
-}
+export { stringToMembership }
 
 export const escapeFilterString = (value: string): string => {
     if (!value) return value
     return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
-
-export { stringToMembership }
