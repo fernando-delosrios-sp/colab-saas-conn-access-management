@@ -1,0 +1,3 @@
+## 2025-02-27 - Setting up Jest for unit tests
+**Learning:** For a new test setup in a TS project, `ts-jest`, `jest` and `@types/jest` need to be installed as devDependencies and a `jest.config.js` with `preset: 'ts-jest'` is needed for Jest to work seamlessly. Ensure to use matching package versions, typically v29, for compatibility across `jest`, `ts-jest` and `@types/jest`. `jest-util` can sometimes be missing if installed incorrectly, and installing it manually solves module resolve issues with Jest.
+**Action:** When a project lacks a test script and tests need to be added, follow the process of installing the correct versions, creating a `jest.config.js` and adding `"test": "jest"` to `package.json`.
