@@ -4,7 +4,6 @@ import { AxiosResponseHeaders } from 'axios'
 import axiosRetry from 'axios-retry'
 
 export const RETRIES = 10
-export const REQUESTSPERSECOND = 10
 export const RETRY_DELAY = 10 * 1000
 
 export const retriesConfig: IAxiosRetryConfig = {
@@ -42,5 +41,3 @@ export const retriesConfig: IAxiosRetryConfig = {
         )
     },
 }
-
-export const throttleConfig = { requestsPerSecond: REQUESTSPERSECOND }
