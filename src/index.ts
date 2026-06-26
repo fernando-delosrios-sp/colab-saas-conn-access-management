@@ -436,17 +436,25 @@ export const connector = async () => {
                                     roleProperties.membership = roleMembership
                                 }
 
-                                logger.debug(`Checking for existing role: ${name}`)
-                                const existingRole = await isc.getRoleByName(name)
-                                if (existingRole) {
-                                    existingRoleMap.set(name, existingRole)
-                                    roleProperties.id = existingRole.id
-                                }
                                 roleMap.set(name, roleProperties)
                             }
                         }
                     }
                 }
+
+                // ⚡ Bolt: Concurrently fetch existing roles to prevent N+1 API calls
+                // This changes sequential fetching inside the loop to a concurrent batch operation
+                // Expected measurable performance impact: Drastically reduces latency proportional to the number of unique roles (e.g. from O(N) network requests to concurrent O(1) time).
+                logger.debug(`Concurrently fetching ${roleMap.size} existing roles`)
+                await Promise.all(
+                    Array.from(roleMap.keys()).map(async (name) => {
+                        const existingRole = await isc.getRoleByName(name)
+                        if (existingRole) {
+                            existingRoleMap.set(name, existingRole)
+                            roleMap.get(name)!.id = existingRole.id
+                        }
+                    })
+                )
 
                 // Create/update roles
                 for (const [roleName, role] of roleMap.entries()) {
