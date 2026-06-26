@@ -1,2 +1,2 @@
 import { execSync } from 'child_process'
-console.log("running checks");
+console.log('running checks')

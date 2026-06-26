@@ -20,6 +20,7 @@ Logging request URLs during failure cases without redacting query strings can le
 
 **Prevention:**
 Parse or split the URL and only log the base URL path (e.g., `url?.split('?')[0]`).
+
 ## 2024-06-26 - Server-Side Template Injection via Velocity Templates
 
 **Vulnerability:**
@@ -30,8 +31,15 @@ The `buildName` utility in `src/utils/index.ts` parsed and evaluated user-contro
 
 **Prevention:**
 Always strictly validate or sandbox template execution contexts. In `velocityjs`, a robust mitigation is to parse the template into an Abstract Syntax Tree (AST) first and traverse it to block any access to `property` or `method` names corresponding to `constructor` before compilation and execution.
+
 ## 2025-02-28 - [Insecure Transmission of Credentials]
 
 **Vulnerability:** The API credentials (`clientId`, `clientSecret`) were allowed to be transmitted over unencrypted `http://` connections if the user misconfigured `config.baseurl`. This exposes credentials in plain text over the network.
 **Learning:** It is crucial to validate user-provided base URLs to enforce `https://` for external endpoints to ensure data in transit is encrypted.
 **Prevention:** In the `ISCClient` constructor, validate that `config.baseurl` starts with `https://` (while allowing `http://localhost` and `http://127.0.0.1` for local development) before making API requests. Also validate the presence of authentication credentials.
+
+## 2025-07-28 - [Bypass of HTTPS requirement via startsWith SSRF vector]
+
+**Vulnerability:** The `baseurl` validation in `src/isc-client.ts` used `config.baseurl?.startsWith('http://localhost')` to allow HTTP for local development. An attacker could bypass the HTTPS requirement by providing a URL like `http://localhost.evil.com`, which satisfies `.startsWith()` but resolves to an external server. This would result in transmitting credentials in plain text over the network.
+**Learning:** String matching like `.startsWith()` is insufficient and insecure for URL validation, as it fails to properly parse the hostname boundary.
+**Prevention:** Always use the WHATWG `URL` constructor to securely parse and validate URL components (`url.protocol`, `url.hostname`) instead of relying on simple string prefixes.
