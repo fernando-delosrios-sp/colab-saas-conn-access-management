@@ -54,6 +54,23 @@ export class ISCClient {
         axiosRetry(axios as any, retriesConfig)
     }
 
+    private async patchResource<T>(
+        ApiClass: new (config: Configuration) => any,
+        methodName: string,
+        id: string,
+        jsonPatchOperationV2025: JsonPatchOperationV2025[],
+        additionalParams: Record<string, any> = {}
+    ): Promise<T> {
+        const api = new ApiClass(this.config)
+        const requestParameters = {
+            id,
+            jsonPatchOperationV2025,
+            ...additionalParams,
+        }
+        const response = await api[methodName](requestParameters)
+        return response.data
+    }
+
     async getPublicIdentityConfig(): Promise<PublicIdentityConfig> {
         const api = new PublicIdentitiesConfigApi(this.config)
 
@@ -130,15 +147,9 @@ export class ISCClient {
         id: string,
         jsonPatchOperationV2025: JsonPatchOperationV2025[]
     ): Promise<SourceAppV2025> {
-        const api = new AppsV2025Api(this.config)
-
-        const requestParameters: AppsV2025ApiPatchSourceAppRequest = {
-            id,
-            jsonPatchOperationV2025,
+        return this.patchResource<SourceAppV2025>(AppsV2025Api, 'patchSourceApp', id, jsonPatchOperationV2025, {
             xSailPointExperimental: 'true',
-        }
-        const response = await api.patchSourceApp(requestParameters)
-        return response.data
+        })
     }
 
     async getSource(id: string): Promise<SourceAppV2025> {
@@ -184,13 +195,12 @@ export class ISCClient {
         id: string,
         jsonPatchOperationV2025: JsonPatchOperationV2025[]
     ): Promise<AccessProfileV2025> {
-        const api = new AccessProfilesV2025Api(this.config)
-        const requestParameters: AccessProfilesV2025ApiPatchAccessProfileRequest = {
+        return this.patchResource<AccessProfileV2025>(
+            AccessProfilesV2025Api,
+            'patchAccessProfile',
             id,
-            jsonPatchOperationV2025,
-        }
-        const response = await api.patchAccessProfile(requestParameters)
-        return response.data
+            jsonPatchOperationV2025
+        )
     }
 
     async createRole(
@@ -223,12 +233,6 @@ export class ISCClient {
     }
 
     async updateRole(id: string, jsonPatchOperationV2025: JsonPatchOperationV2025[]): Promise<RoleV2025> {
-        const api = new RolesV2025Api(this.config)
-        const requestParameters: RolesV2025ApiPatchRoleRequest = {
-            id,
-            jsonPatchOperationV2025,
-        }
-        const response = await api.patchRole(requestParameters)
-        return response.data
+        return this.patchResource<RoleV2025>(RolesV2025Api, 'patchRole', id, jsonPatchOperationV2025)
     }
 }
