@@ -59,13 +59,14 @@ export const connector = async () => {
                 logger.debug(`Processing ${config.accessProfiles.length} accessProfiles`)
                 const applicationMap = new Map<string, ApplicationProperties>()
                 const accessProfileMap = new Map<string, AccessProfileProperties>()
-                const entitlementMap = new Map<string, EntitlementV2025[]>()
                 const existingAccessProfileMap = new Map<string, AccessProfileV2025>()
                 const existingAppMap = new Map<string, SourceAppV2025>()
                 // ⚡ Bolt: Cache source owners to avoid N+1 API calls for identical source IDs
                 const sourceOwnerMap = new Map<string, string>()
                 // Process each definition
                 accessProfiles: for (const definition of config.accessProfiles) {
+                    // ⚡ Bolt: Scope entitlementMap to definition loop to avoid O(n²) redundant re-processing
+                    const entitlementMap = new Map<string, EntitlementV2025[]>()
                     logger.debug(`Processing definition: ${definition.name}`)
                     const entitlements = await isc.listEntitlements(definition.query)
                     logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
@@ -184,17 +185,28 @@ export const connector = async () => {
                                     }
                                 }
 
-                                logger.debug(`Checking for existing access profile: ${name}`)
-                                const existingAp = await isc.getAccessProfileByName(name)
-                                if (existingAp) {
-                                    existingAccessProfileMap.set(name, existingAp)
-                                    accessProfileProperties.id = existingAp.id
-                                }
                                 accessProfileMap.set(name, accessProfileProperties)
                             }
                         }
                     }
                 }
+
+                // ⚡ Bolt: Fetch existing access profiles concurrently using Promise.all to avoid N+1 sequential blocking
+                logger.debug(`Fetching existing access profiles for ${accessProfileMap.size} candidates concurrently`)
+                const apNames = Array.from(accessProfileMap.keys())
+                const apPromises = apNames.map((name) => isc.getAccessProfileByName(name))
+                const existingAps = await Promise.all(apPromises)
+
+                existingAps.forEach((existingAp, index) => {
+                    if (existingAp) {
+                        const name = apNames[index]
+                        existingAccessProfileMap.set(name, existingAp)
+                        const accessProfileProperties = accessProfileMap.get(name)
+                        if (accessProfileProperties) {
+                            accessProfileProperties.id = existingAp.id
+                        }
+                    }
+                })
 
                 // Create/update access profiles
                 for (const [apName, ap] of accessProfileMap.entries()) {
@@ -347,7 +359,6 @@ export const connector = async () => {
             if (config.roles) {
                 logger.debug(`Processing ${config.roles.length} roles`)
                 const roleMap = new Map<string, RoleProperties>()
-                const entitlementMap = new Map<string, EntitlementV2025[]>()
                 const existingRoleMap = new Map<string, RoleV2025>()
 
                 const sources = await isc.listSources()
@@ -364,6 +375,8 @@ export const connector = async () => {
 
                 // Process each definition
                 roles: for (const definition of config.roles) {
+                    // ⚡ Bolt: Scope entitlementMap to definition loop to avoid O(n²) redundant re-processing
+                    const entitlementMap = new Map<string, EntitlementV2025[]>()
                     logger.debug(`Processing definition: ${definition.name}`)
 
                     // ⚡ Bolt: Hoist stringToMembership parsing outside the inner entitlement group loop
@@ -436,17 +449,28 @@ export const connector = async () => {
                                     roleProperties.membership = roleMembership
                                 }
 
-                                logger.debug(`Checking for existing role: ${name}`)
-                                const existingRole = await isc.getRoleByName(name)
-                                if (existingRole) {
-                                    existingRoleMap.set(name, existingRole)
-                                    roleProperties.id = existingRole.id
-                                }
                                 roleMap.set(name, roleProperties)
                             }
                         }
                     }
                 }
+
+                // ⚡ Bolt: Fetch existing roles concurrently using Promise.all to avoid N+1 sequential blocking
+                logger.debug(`Fetching existing roles for ${roleMap.size} candidates concurrently`)
+                const roleNames = Array.from(roleMap.keys())
+                const rolePromises = roleNames.map((name) => isc.getRoleByName(name))
+                const existingRoles = await Promise.all(rolePromises)
+
+                existingRoles.forEach((existingRole, index) => {
+                    if (existingRole) {
+                        const name = roleNames[index]
+                        existingRoleMap.set(name, existingRole)
+                        const roleProperties = roleMap.get(name)
+                        if (roleProperties) {
+                            roleProperties.id = existingRole.id
+                        }
+                    }
+                })
 
                 // Create/update roles
                 for (const [roleName, role] of roleMap.entries()) {
