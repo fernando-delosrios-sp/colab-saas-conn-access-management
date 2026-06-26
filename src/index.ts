@@ -184,14 +184,29 @@ export const connector = async () => {
                                     }
                                 }
 
-                                logger.debug(`Checking for existing access profile: ${name}`)
-                                const existingAp = await isc.getAccessProfileByName(name)
-                                if (existingAp) {
-                                    existingAccessProfileMap.set(name, existingAp)
-                                    accessProfileProperties.id = existingAp.id
-                                }
                                 accessProfileMap.set(name, accessProfileProperties)
                             }
+                        }
+                    }
+                }
+
+                // Concurrent fetch for existing access profiles
+                const apNames = Array.from(accessProfileMap.keys())
+                logger.debug(`Fetching ${apNames.length} existing access profiles concurrently`)
+                const existingAps = await Promise.all(
+                    apNames.map(async (name) => {
+                        return {
+                            name,
+                            existingAp: await isc.getAccessProfileByName(name),
+                        }
+                    })
+                )
+                for (const { name, existingAp } of existingAps) {
+                    if (existingAp) {
+                        existingAccessProfileMap.set(name, existingAp)
+                        const props = accessProfileMap.get(name)
+                        if (props) {
+                            props.id = existingAp.id
                         }
                     }
                 }
@@ -436,14 +451,29 @@ export const connector = async () => {
                                     roleProperties.membership = roleMembership
                                 }
 
-                                logger.debug(`Checking for existing role: ${name}`)
-                                const existingRole = await isc.getRoleByName(name)
-                                if (existingRole) {
-                                    existingRoleMap.set(name, existingRole)
-                                    roleProperties.id = existingRole.id
-                                }
                                 roleMap.set(name, roleProperties)
                             }
+                        }
+                    }
+                }
+
+                // Concurrent fetch for existing roles
+                const roleNames = Array.from(roleMap.keys())
+                logger.debug(`Fetching ${roleNames.length} existing roles concurrently`)
+                const existingRoles = await Promise.all(
+                    roleNames.map(async (name) => {
+                        return {
+                            name,
+                            existingRole: await isc.getRoleByName(name),
+                        }
+                    })
+                )
+                for (const { name, existingRole } of existingRoles) {
+                    if (existingRole) {
+                        existingRoleMap.set(name, existingRole)
+                        const props = roleMap.get(name)
+                        if (props) {
+                            props.id = existingRole.id
                         }
                     }
                 }

@@ -5,3 +5,7 @@
 ## 2024-06-22 - Cached Velocity Template Compilation
 **Learning:** In loops processing thousands of items (like entitlements), parsing and compiling template strings (like `velocityjs`) on every iteration creates a significant bottleneck.
 **Action:** Introduced a module-level `Map` cache to memoize the compiled velocity AST by template string, drastically reducing rendering overhead for repeated templates.
+
+## 2026-06-26 - [Bolt] Resolve N+1 Access Profile & Role API Calls
+**Learning:** Sequential `.getAccessProfileByName` or `.getRoleByName` API calls within inner aggregation loops cause major network bottlenecks. The connector waits sequentially for every unique entitlement mapping.
+**Action:** Replaced inline `await` calls with deferred extraction mapping. All unique profiles and roles are extracted from the loop aggregation map's keys. These keys are fetched concurrently using `Promise.all` reducing the time complexity of the API barrier wait from O(N) sequential requests down to bounded parallel batches. Under-the-hood, `axios-retry` natively protects these batches against transient HTTP 429 limits.
