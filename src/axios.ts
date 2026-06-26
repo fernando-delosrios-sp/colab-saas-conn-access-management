@@ -4,7 +4,6 @@ import { AxiosResponseHeaders } from 'axios'
 import axiosRetry from 'axios-retry'
 
 export const RETRIES = 10
-export const REQUESTSPERSECOND = 10
 export const RETRY_DELAY = 10 * 1000
 
 export const retriesConfig: IAxiosRetryConfig = {
@@ -12,8 +11,7 @@ export const retriesConfig: IAxiosRetryConfig = {
     retryDelay: (retryCount, error) => {
         // Check if response and headers exist before accessing retry-after
         if (error.response?.headers) {
-            type NewType = AxiosResponseHeaders
-            const headers = error.response.headers as NewType
+            const headers = error.response.headers as AxiosResponseHeaders
             const retryAfter = headers.get('retry-after')
 
             if (retryAfter) {
@@ -43,5 +41,3 @@ export const retriesConfig: IAxiosRetryConfig = {
         )
     },
 }
-
-export const throttleConfig = { requestsPerSecond: REQUESTSPERSECOND }

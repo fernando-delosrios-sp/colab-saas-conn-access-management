@@ -10,7 +10,8 @@
         "debug": "spcx run dist/index.js",
         "prettier": "npx prettier --write .",
         "prepack-zip": "npm ci && npm run build",
-        "pack-zip": "spcx package"
+        "pack-zip": "spcx package",
+        "test": "tsx --test src/utils/index.test.ts"
     },
     "private": true,
     "dependencies": {
@@ -21,10 +22,12 @@
         "velocityjs": "^2.1.5"
     },
     "devDependencies": {
+        "@types/node": "^26.0.1",
         "@vercel/ncc": "^0.34.0",
         "cross-env": "7.0.3",
         "prettier": "^2.3.2",
         "shx": "^0.3.3",
+        "tsx": "^4.22.4",
         "typescript": "^5.3.3",
         "typescript-eslint": "^8.2.0"
     },

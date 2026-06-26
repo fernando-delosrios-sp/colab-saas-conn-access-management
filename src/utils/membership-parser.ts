@@ -16,10 +16,6 @@ function isSpace(char: string): boolean {
     return /^[ \t]$/.test(char)
 }
 
-function isQuote(char: string): boolean {
-    return /^["']$/.test(char)
-}
-
 class StringIterator {
     private currentIndex = 0
 
@@ -44,7 +40,7 @@ class StringIterator {
 
     public readToken() {
         this.skipSpace()
-        if (isQuote(this.current)) {
+        if (/^["']$/.test(this.current)) {
             this.advance() // skipping quote
             const token = this.moveTo(/^["']$/)
             this.advance() // skipping quote
@@ -133,10 +129,7 @@ class Literal implements Expression {
 }
 
 class LogicalOperator implements Expression {
-    constructor(
-        public readonly operation: LogicalOperation,
-        public readonly children: Expression[]
-    ) {}
+    constructor(public readonly operation: LogicalOperation, public readonly children: Expression[]) {}
 
     public async accept<T>(v: Visitor<T>, arg: T) {
         await v.visitLogicalOperator(this, arg)
