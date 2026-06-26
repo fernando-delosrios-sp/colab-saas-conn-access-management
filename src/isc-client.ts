@@ -42,6 +42,15 @@ export class ISCClient {
     private config: Configuration
 
     constructor(config: Config) {
+        // Security enhancement: Validate config to prevent misconfiguration
+        // and ensure secure transmission of credentials over HTTPS
+        if (!config.baseurl?.startsWith('https://') && !config.baseurl?.startsWith('http://localhost') && !config.baseurl?.startsWith('http://127.0.0.1')) {
+            throw new Error('Security Error: baseurl must use https:// to prevent unencrypted transmission of credentials')
+        }
+        if (!config.clientId || !config.clientSecret) {
+            throw new Error('Security Error: Missing required authentication credentials in configuration')
+        }
+
         const conf: ConfigurationParameters = {
             baseurl: config.baseurl,
             clientId: config.clientId,
@@ -52,6 +61,23 @@ export class ISCClient {
         this.config.retriesConfig = retriesConfig
         this.config.experimental = true
         axiosRetry(axios as any, retriesConfig)
+    }
+
+    private async patchResource<T>(
+        ApiClass: new (config: Configuration) => any,
+        methodName: string,
+        id: string,
+        jsonPatchOperationV2025: JsonPatchOperationV2025[],
+        additionalParams: Record<string, any> = {}
+    ): Promise<T> {
+        const api = new ApiClass(this.config)
+        const requestParameters = {
+            id,
+            jsonPatchOperationV2025,
+            ...additionalParams,
+        }
+        const response = await api[methodName](requestParameters)
+        return response.data
     }
 
     async getPublicIdentityConfig(): Promise<PublicIdentityConfig> {
@@ -130,15 +156,9 @@ export class ISCClient {
         id: string,
         jsonPatchOperationV2025: JsonPatchOperationV2025[]
     ): Promise<SourceAppV2025> {
-        const api = new AppsV2025Api(this.config)
-
-        const requestParameters: AppsV2025ApiPatchSourceAppRequest = {
-            id,
-            jsonPatchOperationV2025,
+        return this.patchResource<SourceAppV2025>(AppsV2025Api, 'patchSourceApp', id, jsonPatchOperationV2025, {
             xSailPointExperimental: 'true',
-        }
-        const response = await api.patchSourceApp(requestParameters)
-        return response.data
+        })
     }
 
     async getSource(id: string): Promise<SourceAppV2025> {
@@ -184,13 +204,12 @@ export class ISCClient {
         id: string,
         jsonPatchOperationV2025: JsonPatchOperationV2025[]
     ): Promise<AccessProfileV2025> {
-        const api = new AccessProfilesV2025Api(this.config)
-        const requestParameters: AccessProfilesV2025ApiPatchAccessProfileRequest = {
+        return this.patchResource<AccessProfileV2025>(
+            AccessProfilesV2025Api,
+            'patchAccessProfile',
             id,
-            jsonPatchOperationV2025,
-        }
-        const response = await api.patchAccessProfile(requestParameters)
-        return response.data
+            jsonPatchOperationV2025
+        )
     }
 
     async createRole(
@@ -223,12 +242,6 @@ export class ISCClient {
     }
 
     async updateRole(id: string, jsonPatchOperationV2025: JsonPatchOperationV2025[]): Promise<RoleV2025> {
-        const api = new RolesV2025Api(this.config)
-        const requestParameters: RolesV2025ApiPatchRoleRequest = {
-            id,
-            jsonPatchOperationV2025,
-        }
-        const response = await api.patchRole(requestParameters)
-        return response.data
+        return this.patchResource<RoleV2025>(RolesV2025Api, 'patchRole', id, jsonPatchOperationV2025)
     }
 }

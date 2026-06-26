@@ -15,6 +15,27 @@ export const normalizeAttributes = (entitlement: EntitlementV2025, _group: strin
     return { ...entitlement, attributes }
 }
 
+function hasConstructor(nodes: any): boolean {
+    if (!nodes) return false
+
+    if (Array.isArray(nodes)) {
+        for (const node of nodes) {
+            if (hasConstructor(node)) return true
+        }
+        return false
+    }
+
+    if (typeof nodes === 'object') {
+        if ((nodes.type === 'property' || nodes.type === 'method') && nodes.id === 'constructor') return true
+
+        for (const key of Object.keys(nodes)) {
+            if (hasConstructor(nodes[key])) return true
+        }
+    }
+
+    return false
+}
+
 // ⚡ Bolt: Cache compiled velocity templates to avoid redundant parsing/compilation
 // for the same nameTemplate string across thousands of entitlements.
 // This reduces template rendering time by ~95% in large entitlement loops.
@@ -24,6 +45,9 @@ export const buildName = (entitlement: EntitlementV2025, definition: Definition)
     let velocity = templateCache.get(definition.nameTemplate)
     if (!velocity) {
         const template = velocityjs.parse(definition.nameTemplate)
+        if (hasConstructor(template)) {
+            throw new Error('Invalid template: access to constructor is not allowed')
+        }
         velocity = new velocityjs.Compile(template)
         templateCache.set(definition.nameTemplate, velocity)
     }
