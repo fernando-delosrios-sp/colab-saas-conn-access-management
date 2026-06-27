@@ -20,6 +20,7 @@ Logging request URLs during failure cases without redacting query strings can le
 
 **Prevention:**
 Parse or split the URL and only log the base URL path (e.g., `url?.split('?')[0]`).
+
 ## 2024-06-26 - Server-Side Template Injection via Velocity Templates
 
 **Vulnerability:**
@@ -30,6 +31,7 @@ The `buildName` utility in `src/utils/index.ts` parsed and evaluated user-contro
 
 **Prevention:**
 Always strictly validate or sandbox template execution contexts. In `velocityjs`, a robust mitigation is to parse the template into an Abstract Syntax Tree (AST) first and traverse it to block any access to `property` or `method` names corresponding to `constructor` before compilation and execution.
+
 ## 2025-02-28 - [Insecure Transmission of Credentials]
 
 **Vulnerability:** The API credentials (`clientId`, `clientSecret`) were allowed to be transmitted over unencrypted `http://` connections if the user misconfigured `config.baseurl`. This exposes credentials in plain text over the network.

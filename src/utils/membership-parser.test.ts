@@ -35,7 +35,7 @@ const mockSources = [
         created: '',
         modified: '',
     },
-] as Source[]
+] as unknown as Source[]
 
 test('stringToMembership - Identity criteria parsing', async (t) => {
     const result = await stringToMembership('Identity.department eq "Engineering"', mockSources)
