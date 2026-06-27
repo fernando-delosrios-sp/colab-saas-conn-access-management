@@ -20,6 +20,7 @@ Logging request URLs during failure cases without redacting query strings can le
 
 **Prevention:**
 Parse or split the URL and only log the base URL path (e.g., `url?.split('?')[0]`).
+
 ## 2024-06-26 - Server-Side Template Injection via Velocity Templates
 
 **Vulnerability:**
@@ -30,8 +31,15 @@ The `buildName` utility in `src/utils/index.ts` parsed and evaluated user-contro
 
 **Prevention:**
 Always strictly validate or sandbox template execution contexts. In `velocityjs`, a robust mitigation is to parse the template into an Abstract Syntax Tree (AST) first and traverse it to block any access to `property` or `method` names corresponding to `constructor` before compilation and execution.
+
 ## 2025-02-28 - [Insecure Transmission of Credentials]
 
 **Vulnerability:** The API credentials (`clientId`, `clientSecret`) were allowed to be transmitted over unencrypted `http://` connections if the user misconfigured `config.baseurl`. This exposes credentials in plain text over the network.
 **Learning:** It is crucial to validate user-provided base URLs to enforce `https://` for external endpoints to ensure data in transit is encrypted.
 **Prevention:** In the `ISCClient` constructor, validate that `config.baseurl` starts with `https://` (while allowing `http://localhost` and `http://127.0.0.1` for local development) before making API requests. Also validate the presence of authentication credentials.
+
+## 2025-02-28 - [URL Validation Bypass]
+
+**Vulnerability:** Insecure validation of the `baseurl` was done using simple `.startsWith()` string matching instead of rigorous URL parsing. This allowed for bypasses (e.g. `http://localhost.evil.com`) leading to Server-Side Request Forgery (SSRF) and transmission of credentials in plain text.
+**Learning:** Checking for safe URL configurations using `.startsWith` on unparsed strings can easily be bypassed by subdomains or malicious top-level domains.
+**Prevention:** Always parse the URL using the `URL` class and explicitly check `.protocol` and `.hostname` properties to strictly enforce secure destinations.
