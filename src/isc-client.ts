@@ -44,11 +44,22 @@ export class ISCClient {
     constructor(config: Config) {
         // Security enhancement: Validate config to prevent misconfiguration
         // and ensure secure transmission of credentials over HTTPS
-        if (
-            !config.baseurl?.startsWith('https://') &&
-            !config.baseurl?.startsWith('http://localhost') &&
-            !config.baseurl?.startsWith('http://127.0.0.1')
-        ) {
+        let isValidUrl = false
+        if (config.baseurl) {
+            try {
+                const url = new URL(config.baseurl)
+                if (
+                    url.protocol === 'https:' ||
+                    (url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'))
+                ) {
+                    isValidUrl = true
+                }
+            } catch (e) {
+                // Invalid URL
+            }
+        }
+
+        if (!isValidUrl) {
             throw new Error(
                 'Security Error: baseurl must use https:// to prevent unencrypted transmission of credentials'
             )
