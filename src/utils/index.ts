@@ -65,26 +65,56 @@ export const entitlementToRef = (entitlement: EntitlementV2025): EntitlementRefV
     }
 }
 
+// ⚡ Bolt: Use O(n) frequency map logic instead of O(n log n) array sorting
+// to improve performance when comparing string arrays and entitlement references.
 export const areStringArraysEqual = (a?: string[], b?: string[]): boolean => {
-    const arrA = (a ?? []).slice().sort()
-    const arrB = (b ?? []).slice().sort()
+    const arrA = a ?? []
+    const arrB = b ?? []
     if (arrA.length !== arrB.length) return false
-    return arrA.every((val, idx) => val === arrB[idx])
+
+    const counts = new Map<string, number>()
+    for (let i = 0; i < arrA.length; i++) {
+        const val = arrA[i]
+        counts.set(val, (counts.get(val) || 0) + 1)
+    }
+
+    for (let i = 0; i < arrB.length; i++) {
+        const val = arrB[i]
+        const count = counts.get(val)
+        if (!count) return false
+        counts.set(val, count - 1)
+    }
+
+    return true
 }
 
 export const areEntitlementRefsEqual = (a?: { id?: string | null }[] | null, b?: { id?: string | null }[]): boolean => {
-    const idsA = (a ?? [])
-        .map((x) => x.id ?? undefined)
-        .filter(Boolean)
-        .slice()
-        .sort()
-    const idsB = (b ?? [])
-        .map((x) => x.id ?? undefined)
-        .filter(Boolean)
-        .slice()
-        .sort()
-    if (idsA.length !== idsB.length) return false
-    return idsA.every((val, idx) => val === idsB[idx])
+    const arrA = a ?? []
+    const arrB = b ?? []
+
+    const counts = new Map<string, number>()
+    let validCountA = 0
+    let validCountB = 0
+
+    for (let i = 0; i < arrA.length; i++) {
+        const id = arrA[i].id
+        if (id) {
+            counts.set(id, (counts.get(id) || 0) + 1)
+            validCountA++
+        }
+    }
+
+    for (let i = 0; i < arrB.length; i++) {
+        const id = arrB[i].id
+        if (id) {
+            const count = counts.get(id)
+            if (!count) return false
+            counts.set(id, count - 1)
+            validCountB++
+        }
+    }
+
+    return validCountA === validCountB
 }
 
 export const areJsonEqual = (a: any, b: any): boolean => {

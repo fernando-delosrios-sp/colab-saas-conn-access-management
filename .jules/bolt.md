@@ -27,3 +27,8 @@
 
 **Learning:** Within deep, nested iteration loops, doing on-the-fly network lookups for dependencies (such as getting application or source ownership data via API) creates immense N+1 bottlenecks.
 **Action:** Before executing nested iteration loops for object processing, do a pre-pass to collect unique identifiers (like `sourceId` and `appName`). Batch fetch these dependencies concurrently via `Promise.all`, store them in memory maps, and then process the loop synchronously.
+
+## 2026-06-28 - Optimize array equality checks
+
+**Learning:** Array sorting (O(n log n)) for simple equality checks creates unnecessary performance overhead in loops. For deep equality on unordered lists, use O(n) frequency maps or Sets.
+**Action:** Use Sets or frequency maps instead of array sorting for array equality comparisons.
