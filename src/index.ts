@@ -123,6 +123,47 @@ export const connector = async () => {
                             entitlementMap.get(definition.name)?.push(entitlement)
                         }
                     }
+                    // ⚡ Bolt: Pre-fetch sources and apps concurrently to avoid N+1 queries
+                    const sourcesToFetch = new Set<string>()
+                    const appsToFetch = new Set<string>()
+                    for (const groupName of entitlementMap.keys()) {
+                        for (const entitlement of entitlementMap.get(groupName)!) {
+                            const sId = entitlement.source!.id!
+                            if (!sourceOwnerMap.has(sId)) {
+                                sourcesToFetch.add(sId)
+                            }
+                            if (definition.createApplication) {
+                                const appName = definition.groupType === 'accessProfile' ? definition.name : groupName
+                                if (!applicationMap.has(appName)) {
+                                    appsToFetch.add(appName)
+                                }
+                            }
+                        }
+                    }
+
+                    if (sourcesToFetch.size > 0 || appsToFetch.size > 0) {
+                        logger.debug(
+                            `Pre-fetching ${sourcesToFetch.size} sources and ${appsToFetch.size} apps concurrently`
+                        )
+                    }
+                    const sourcePromises = Array.from(sourcesToFetch).map(async (sId) => {
+                        const source = await isc.getSource(sId)
+                        if (source.owner?.id) {
+                            sourceOwnerMap.set(sId, source.owner.id)
+                        }
+                    })
+                    const appPromises = Array.from(appsToFetch).map(async (appName) => {
+                        const app = await isc.getAppByName(appName)
+                        return { appName, app }
+                    })
+
+                    const [_, fetchedApps] = await Promise.all([Promise.all(sourcePromises), Promise.all(appPromises)])
+
+                    const prefetchedApps = new Map<string, SourceAppV2025 | undefined>()
+                    fetchedApps.forEach(({ appName, app }) => {
+                        prefetchedApps.set(appName, app)
+                    })
+
                     groups: for (const groupName of entitlementMap.keys()) {
                         logger.debug(`Processing group: ${groupName}`)
                         let sourceId: string
@@ -134,18 +175,13 @@ export const connector = async () => {
                             const entitlementRef = entitlementToRef(entitlement)
                             sourceId = entitlement.source!.id!
                             if (!ownerId) {
-                                if (sourceOwnerMap.has(sourceId)) {
-                                    ownerId = sourceOwnerMap.get(sourceId)!
-                                } else {
-                                    ownerId = (await isc.getSource(sourceId)).owner!.id!
-                                    sourceOwnerMap.set(sourceId, ownerId)
-                                }
+                                ownerId = sourceOwnerMap.get(sourceId)
                             }
                             const appName = definition.groupType === 'accessProfile' ? definition.name : groupName
                             if (definition.createApplication) {
                                 if (!applicationMap.has(appName)) {
                                     logger.debug(`Looking up app: ${appName}`)
-                                    app = await isc.getAppByName(appName)
+                                    app = prefetchedApps.get(appName)
                                     if (app) {
                                         if (app.accountSource?.id !== sourceId) {
                                             logger.error(
@@ -170,7 +206,7 @@ export const connector = async () => {
                             } else {
                                 accessProfileProperties = {
                                     appName,
-                                    ownerId,
+                                    ownerId: ownerId as string, // ownerId should always be present after prefetching
                                     sourceId,
                                     entitlements: [entitlementRef],
                                     requestable: definition.requestable,
