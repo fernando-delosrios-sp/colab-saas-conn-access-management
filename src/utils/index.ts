@@ -139,4 +139,19 @@ export const escapeFilterString = (value: string): string => {
     return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
+// ⚡ Bolt: Utility to process items concurrently with a fixed limit
+// to avoid socket exhaustion/rate-limiting on large payloads.
+export const processConcurrent = async <T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> => {
+    const results: R[] = new Array(items.length)
+    let index = 0
+    const worker = async () => {
+        while (index < items.length) {
+            const currentIndex = index++
+            results[currentIndex] = await fn(items[currentIndex])
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+    return results
+}
+
 export { stringToMembership }
