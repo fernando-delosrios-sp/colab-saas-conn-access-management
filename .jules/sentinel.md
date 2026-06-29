@@ -43,3 +43,9 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** The application was validating if `config.baseurl` used HTTPS by simply checking if the string started with `https://`, `http://localhost`, or `http://127.0.0.1`.
 **Learning:** Checking string prefixes for URL validation is easily bypassed. An attacker can supply a domain like `http://localhost.attacker.com` which matches the prefix check (`.startsWith('http://localhost')`), allowing unencrypted transmission of credentials and potentially creating a Server-Side Request Forgery (SSRF) vulnerability.
 **Prevention:** Always use proper URL parsing (e.g., `new URL(config.baseurl)`) to validate URL structure and parts (like `protocol` and `hostname`) rather than relying on substring string manipulation.
+
+## 2025-02-28 - [Resource Exhaustion Risk in External API Calls]
+
+**Vulnerability:** External API calls were being made via `sailpoint-api-client` (which uses `axios` underneath) without an explicit timeout configured in `baseOptions`. Hanging requests from a sluggish or unresponsive downstream API could cause the Node.js application to block workers, consume all available memory and connections, leading to a Denial of Service (DoS).
+**Learning:** Default HTTP client configurations often have no timeout (or a very long one). It's crucial to explicitly define timeouts on API configurations to ensure the application fails fast and releases resources during network or third-party service degradation.
+**Prevention:** Always inject a sane timeout (e.g., 30000ms) into `this.config.baseOptions` when initializing external API clients. Make sure to preserve existing `baseOptions` using spread syntax.
