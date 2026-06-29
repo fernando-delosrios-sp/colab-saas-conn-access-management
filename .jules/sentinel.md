@@ -37,3 +37,9 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** The API credentials (`clientId`, `clientSecret`) were allowed to be transmitted over unencrypted `http://` connections if the user misconfigured `config.baseurl`. This exposes credentials in plain text over the network.
 **Learning:** It is crucial to validate user-provided base URLs to enforce `https://` for external endpoints to ensure data in transit is encrypted.
 **Prevention:** In the `ISCClient` constructor, validate that `config.baseurl` starts with `https://` (while allowing `http://localhost` and `http://127.0.0.1` for local development) before making API requests. Also validate the presence of authentication credentials.
+
+## 2026-06-28 - [SSRF & Insecure Credential Transmission via Weak URL Validation]
+
+**Vulnerability:** The application was validating if `config.baseurl` used HTTPS by simply checking if the string started with `https://`, `http://localhost`, or `http://127.0.0.1`.
+**Learning:** Checking string prefixes for URL validation is easily bypassed. An attacker can supply a domain like `http://localhost.attacker.com` which matches the prefix check (`.startsWith('http://localhost')`), allowing unencrypted transmission of credentials and potentially creating a Server-Side Request Forgery (SSRF) vulnerability.
+**Prevention:** Always use proper URL parsing (e.g., `new URL(config.baseurl)`) to validate URL structure and parts (like `protocol` and `hostname`) rather than relying on substring string manipulation.
