@@ -32,3 +32,8 @@
 
 **Learning:** Array sorting (O(n log n)) for simple equality checks creates unnecessary performance overhead in loops. For deep equality on unordered lists, use O(n) frequency maps or Sets.
 **Action:** Use Sets or frequency maps instead of array sorting for array equality comparisons.
+
+## 2026-06-29 - Concurrency Limits for Bulk API Operations
+
+**Learning:** When using `Promise.all` mapping over arrays of dynamic size (like entitlements, role definitions, or applications) without concurrency constraints, the process rapidly exhausts available sockets or encounters HTTP 429 API rate limits, especially under mass-provisioning loads.
+**Action:** Always batch and restrict concurrent operations when executing iterative network requests via a bounded concurrency utility (like `processConcurrent`) instead of using unbounded `Promise.all(array.map(...))` to guarantee stable execution.
