@@ -32,3 +32,8 @@
 
 **Learning:** Array sorting (O(n log n)) for simple equality checks creates unnecessary performance overhead in loops. For deep equality on unordered lists, use O(n) frequency maps or Sets.
 **Action:** Use Sets or frequency maps instead of array sorting for array equality comparisons.
+
+## 2024-07-29 - Concurrency Rate Limiting using processConcurrent
+
+**Learning:** When evaluating thousands of roles or access profiles, unbounded \`Promise.all()\` mapping across API network operations leads to socket exhaustion and HTTP 429 rate limit errors from the API gateway.
+**Action:** Introduced a generic \`processConcurrent\` utility to restrict parallel execution using a sliding window chunk limit. This resolves rate limiting and resource crashing while maintaining high asynchronous throughput during mass mapping.

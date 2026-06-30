@@ -140,3 +140,19 @@ export const escapeFilterString = (value: string): string => {
 }
 
 export { stringToMembership }
+
+// ⚡ Bolt: Utility to batch concurrent operations and prevent socket exhaustion/rate limits
+export async function processConcurrent<T, R>(items: T[], fn: (item: T) => Promise<R>, limit = 10): Promise<R[]> {
+    const results: R[] = new Array(items.length)
+    let index = 0
+
+    const workers = new Array(Math.min(limit, items.length)).fill(null).map(async () => {
+        while (index < items.length) {
+            const currentIndex = index++
+            results[currentIndex] = await fn(items[currentIndex])
+        }
+    })
+
+    await Promise.all(workers)
+    return results
+}
