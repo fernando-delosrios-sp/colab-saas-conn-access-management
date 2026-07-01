@@ -25,6 +25,7 @@ import {
     getErrorMessage,
     normalizeAttributes,
     stringToMembership,
+    processConcurrent,
 } from './utils'
 
 export const PROCESSINGWAIT = 60 * 1000
@@ -63,12 +64,22 @@ export const connector = async () => {
                 const existingAppMap = new Map<string, SourceAppV2025>()
                 // ⚡ Bolt: Cache source owners to avoid N+1 API calls for identical source IDs
                 const sourceOwnerMap = new Map<string, string>()
+                // ⚡ Bolt: Pre-fetch entitlements for all definition queries concurrently
+                const uniqueQueries = Array.from(new Set(config.accessProfiles.map((d) => d.query)))
+                logger.debug(`Pre-fetching entitlements for ${uniqueQueries.length} unique queries`)
+                const queryResults = await processConcurrent(uniqueQueries, async (query) => {
+                    const entitlements = await isc.listEntitlements(query)
+                    return { query, entitlements }
+                })
+                const queryToEntitlementsMap = new Map<string, EntitlementV2025[]>()
+                queryResults.forEach((res) => queryToEntitlementsMap.set(res.query, res.entitlements))
+
                 // Process each definition
                 accessProfiles: for (const definition of config.accessProfiles) {
                     // ⚡ Bolt: Scope entitlementMap to definition loop to avoid O(n²) redundant re-processing
                     const entitlementMap = new Map<string, EntitlementV2025[]>()
                     logger.debug(`Processing definition: ${definition.name}`)
-                    const entitlements = await isc.listEntitlements(definition.query)
+                    const entitlements = queryToEntitlementsMap.get(definition.query) || []
                     logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
                     // Get entitlements, access profiles, and applications from each entitlement found
                     entitlements: for (let entitlement of entitlements) {

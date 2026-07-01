@@ -140,3 +140,23 @@ export const escapeFilterString = (value: string): string => {
 }
 
 export { stringToMembership }
+
+export const processConcurrent = async <T, R>(
+    items: T[],
+    fn: (item: T) => Promise<R>,
+    concurrencyLimit: number = 10
+): Promise<R[]> => {
+    const results: R[] = new Array(items.length)
+    let i = 0
+
+    const execute = async () => {
+        while (i < items.length) {
+            const index = i++
+            results[index] = await fn(items[index])
+        }
+    }
+
+    const workers = Array.from({ length: Math.min(concurrencyLimit, items.length) }, () => execute())
+    await Promise.all(workers)
+    return results
+}
