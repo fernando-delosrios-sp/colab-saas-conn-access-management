@@ -42,3 +42,91 @@ describe('areJsonEqual', () => {
         expect(areJsonEqual(undefined, 'a')).toBe(false)
     })
 })
+
+import { normalizeAttributes } from './index'
+
+describe('normalizeAttributes', () => {
+    it('should correctly normalize all attributes', () => {
+        const entitlement = {
+            id: '123',
+            name: 'ent1',
+            value: 'val1',
+            source: { id: 's1', name: 'source1', type: 'SOURCE' },
+            attributes: { customAttr: 'customValue' },
+            type: 'ENTITLEMENT',
+        } as any
+
+        const result = normalizeAttributes(entitlement, 'group1')
+
+        expect(result.attributes).toEqual({
+            customAttr: 'customValue',
+            name: 'ent1',
+            value: 'val1',
+            _source: 'source1',
+            _group: 'group1',
+        })
+        expect(result.id).toBe('123')
+    })
+
+    it('should handle undefined source', () => {
+        const entitlement = {
+            id: '123',
+            name: 'ent1',
+            value: 'val1',
+            attributes: {},
+            type: 'ENTITLEMENT',
+        } as any
+
+        const result = normalizeAttributes(entitlement, 'group1')
+
+        expect(result.attributes!._source).toBeUndefined()
+    })
+
+    it('should handle undefined _group', () => {
+        const entitlement = {
+            id: '123',
+            name: 'ent1',
+            value: 'val1',
+            source: { id: 's1', name: 'source1', type: 'SOURCE' },
+            attributes: {},
+            type: 'ENTITLEMENT',
+        } as any
+
+        const result = normalizeAttributes(entitlement, undefined)
+
+        expect(result.attributes!._group).toBeUndefined()
+    })
+
+    it('should preserve existing attributes alongside new ones', () => {
+        const entitlement = {
+            id: '123',
+            name: 'ent1',
+            value: 'val1',
+            source: { id: 's1', name: 'source1', type: 'SOURCE' },
+            attributes: { existingKey: 'existingValue' },
+            type: 'ENTITLEMENT',
+        } as any
+
+        const result = normalizeAttributes(entitlement, 'group1')
+
+        expect(result.attributes!.existingKey).toBe('existingValue')
+        expect(result.attributes!.name).toBe('ent1')
+        expect(result.attributes!._source).toBe('source1')
+    })
+
+    it('should overwrite existing attributes if they collide with reserved keys', () => {
+        const entitlement = {
+            id: '123',
+            name: 'ent1',
+            value: 'val1',
+            source: { id: 's1', name: 'source1', type: 'SOURCE' },
+            attributes: { name: 'oldName', _source: 'oldSource' },
+            type: 'ENTITLEMENT',
+        } as any
+
+        const result = normalizeAttributes(entitlement, 'group1')
+
+        expect(result.attributes!.name).toBe('ent1')
+        expect(result.attributes!._source).toBe('source1')
+    })
+})
