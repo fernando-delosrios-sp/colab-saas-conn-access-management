@@ -32,3 +32,7 @@
 
 **Learning:** Array sorting (O(n log n)) for simple equality checks creates unnecessary performance overhead in loops. For deep equality on unordered lists, use O(n) frequency maps or Sets.
 **Action:** Use Sets or frequency maps instead of array sorting for array equality comparisons.
+
+## 2026-07-01 - Prevent N+1 API query bottlenecks in Entitlement Fetching
+**Learning:** Sequential processing in loops of remote data fetches leads to N+1 API query bottlenecks which impact application performance. In this connector SDK context, fetching entitlements in a sequential manner per access profile definition resulted in poor throughput.
+**Action:** Batched network requests by extracting unique queries into Sets and fetching them concurrently using a concurrency limiter utility (`processConcurrent`) with `Promise.all` before iteration begins.
