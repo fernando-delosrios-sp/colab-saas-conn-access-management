@@ -1,4 +1,5 @@
-import { areJsonEqual } from './index'
+import { areJsonEqual, entitlementToRef } from './index'
+import { EntitlementV2025 } from 'sailpoint-api-client'
 
 describe('areJsonEqual', () => {
     it('should return true for identical primitive values', () => {
@@ -40,5 +41,41 @@ describe('areJsonEqual', () => {
 
         expect(areJsonEqual(null, 'a')).toBe(false)
         expect(areJsonEqual(undefined, 'a')).toBe(false)
+    })
+})
+
+describe('entitlementToRef', () => {
+    it('should correctly transform an EntitlementV2025 to EntitlementRefV2025', () => {
+        const entitlement = {
+            id: 'ent123',
+            name: 'Admin Access',
+        } as unknown as EntitlementV2025
+
+        const result = entitlementToRef(entitlement)
+
+        expect(result).toEqual({
+            id: 'ent123',
+            name: 'Admin Access',
+            type: 'ENTITLEMENT',
+        })
+    })
+
+    it('should ignore extra properties in the input object', () => {
+        const entitlement: any = {
+            id: 'ent456',
+            name: 'User Access',
+            type: 'ENTITLEMENT',
+            description: 'Basic access',
+            created: '2023-01-01T00:00:00Z',
+            attributes: { role: 'user' },
+        }
+
+        const result = entitlementToRef(entitlement)
+
+        expect(result).toEqual({
+            id: 'ent456',
+            name: 'User Access',
+            type: 'ENTITLEMENT',
+        })
     })
 })
