@@ -1,0 +1,10 @@
+🧪 [testing improvement] Add ISCClient URL validation tests
+
+🎯 **What:**
+The testing gap addressed is the missing error path test for the ISCClient constructor regarding HTTP URL validation.
+
+📊 **Coverage:**
+The test coverage now includes the scenario where a non-https url without the `localhost` or `127.0.0.1` origins is passed. It successfully verifies the resulting `Error` object being thrown. Moreover, it tests that `http://localhost` and `http://127.0.0.1` explicitly do not throw errors.
+
+✨ **Result:**
+The improvement in test coverage guarantees that we correctly evaluate security restrictions in future releases and avoid unencrypted credentials.
