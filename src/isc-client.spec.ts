@@ -56,6 +56,51 @@ describe('ISCClient', () => {
                 })
             )
         })
+
+        it('should throw an error if baseurl is http and not localhost', () => {
+            const mockConfigConst = {
+                baseurl: 'http://test.api.identitynow.com',
+                clientId: 'client-id',
+                clientSecret: 'client-secret',
+                spConnectorInstanceId: 'instance-1',
+                spConnectorSpecId: 'spec-1',
+                spConnectorSupportsCustomSchemas: false,
+            }
+
+            expect(() => {
+                new ISCClient(mockConfigConst)
+            }).toThrow('Security Error: baseurl must use https:// to prevent unencrypted transmission of credentials')
+        })
+
+        it('should not throw an error if baseurl is http and localhost', () => {
+            const mockConfigConst = {
+                baseurl: 'http://localhost',
+                clientId: 'client-id',
+                clientSecret: 'client-secret',
+                spConnectorInstanceId: 'instance-1',
+                spConnectorSpecId: 'spec-1',
+                spConnectorSupportsCustomSchemas: false,
+            }
+
+            expect(() => {
+                new ISCClient(mockConfigConst)
+            }).not.toThrow()
+        })
+
+        it('should not throw an error if baseurl is http and 127.0.0.1', () => {
+            const mockConfigConst = {
+                baseurl: 'http://127.0.0.1',
+                clientId: 'client-id',
+                clientSecret: 'client-secret',
+                spConnectorInstanceId: 'instance-1',
+                spConnectorSpecId: 'spec-1',
+                spConnectorSupportsCustomSchemas: false,
+            }
+
+            expect(() => {
+                new ISCClient(mockConfigConst)
+            }).not.toThrow()
+        })
     })
 
     describe('getPublicIdentityConfig', () => {
