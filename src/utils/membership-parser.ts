@@ -267,8 +267,14 @@ function comparisonOperationMapper(op: ComparisonOperation): RoleCriteriaOperati
 
 class RoleMembershipSelectorConverter implements Visitor<RoleCriteriaLevel1> {
     root: RoleCriteriaLevel1 | undefined = undefined
+    private readonly sourceMap: Map<string, Source>
 
-    constructor(private readonly sources: Source[]) {}
+    constructor(private readonly sources: Source[]) {
+        this.sourceMap = new Map()
+        for (const s of sources) {
+            this.sourceMap.set(s.name, s)
+        }
+    }
 
     async visitExpression(val: Expression, arg: RoleCriteriaLevel1): Promise<void> {
         await val.accept(this, arg)
@@ -291,7 +297,7 @@ class RoleMembershipSelectorConverter implements Visitor<RoleCriteriaLevel1> {
         let property = `attribute.${val.property}`
         let sourceId: string | undefined
         if (keyType !== RoleCriteriaKeyType.Identity) {
-            const source = this.sources.find((x) => x.name === val.sourceName)
+            const source = val.sourceName ? this.sourceMap.get(val.sourceName) : undefined
             if (source) {
                 sourceId = source.id
             }
