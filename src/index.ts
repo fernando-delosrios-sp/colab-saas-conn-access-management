@@ -19,7 +19,6 @@ import { AccessProfileProperties, ApplicationProperties, RoleProperties } from '
 import {
     areEntitlementRefsEqual,
     areJsonEqual,
-    areStringArraysEqual,
     buildName,
     entitlementToRef,
     getErrorMessage,
@@ -367,9 +366,9 @@ export const connector = async () => {
                         ]
 
                         if (existingApp) {
-                            const accessProfilesChanged = !areStringArraysEqual(
-                                (existingApp as any).accessProfiles,
-                                accessProfiles
+                            const accessProfilesChanged = !areJsonEqual(
+                                [...((existingApp as any).accessProfiles || [])].sort(),
+                                [...(accessProfiles || [])].sort()
                             )
                             const enabledChanged = existingApp.enabled !== true
                             const appCenterEnabledChanged = existingApp.appCenterEnabled !== true

@@ -65,29 +65,6 @@ export const entitlementToRef = (entitlement: EntitlementV2025): EntitlementRefV
     }
 }
 
-// ⚡ Bolt: Use O(n) frequency map logic instead of O(n log n) array sorting
-// to improve performance when comparing string arrays and entitlement references.
-export const areStringArraysEqual = (a?: string[], b?: string[]): boolean => {
-    const arrA = a ?? []
-    const arrB = b ?? []
-    if (arrA.length !== arrB.length) return false
-
-    const counts = new Map<string, number>()
-    for (let i = 0; i < arrA.length; i++) {
-        const val = arrA[i]
-        counts.set(val, (counts.get(val) || 0) + 1)
-    }
-
-    for (let i = 0; i < arrB.length; i++) {
-        const val = arrB[i]
-        const count = counts.get(val)
-        if (!count) return false
-        counts.set(val, count - 1)
-    }
-
-    return true
-}
-
 export const areEntitlementRefsEqual = (a?: { id?: string | null }[] | null, b?: { id?: string | null }[]): boolean => {
     const arrA = a ?? []
     const arrB = b ?? []
