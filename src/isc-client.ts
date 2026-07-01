@@ -48,10 +48,7 @@ export class ISCClient {
         if (config.baseurl) {
             try {
                 const url = new URL(config.baseurl)
-                if (
-                    url.protocol === 'https:' ||
-                    (url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'))
-                ) {
+                if (url.protocol === 'https:') {
                     isValidUrl = true
                 }
             } catch (e) {
