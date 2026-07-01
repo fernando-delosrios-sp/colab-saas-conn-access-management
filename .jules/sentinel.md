@@ -49,8 +49,15 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** External API calls were being made via `sailpoint-api-client` (which uses `axios` underneath) without an explicit timeout configured in `baseOptions`. Hanging requests from a sluggish or unresponsive downstream API could cause the Node.js application to block workers, consume all available memory and connections, leading to a Denial of Service (DoS).
 **Learning:** Default HTTP client configurations often have no timeout (or a very long one). It's crucial to explicitly define timeouts on API configurations to ensure the application fails fast and releases resources during network or third-party service degradation.
 **Prevention:** Always inject a sane timeout (e.g., 30000ms) into `this.config.baseOptions` when initializing external API clients. Make sure to preserve existing `baseOptions` using spread syntax.
+
 ## 2025-02-28 - [DoS via Socket Exhaustion in Concurrent Loops]
 
 **Vulnerability:** The application was using unbounded `Promise.all` arrays to perform dozens or hundreds of concurrent API requests (e.g. `isc.getAccessProfileByName`). This causes sudden spikes in network traffic, exhausting available sockets and leading to DoS conditions, timeouts, and API rate limits (HTTP 429).
 **Learning:** Sending unbounded concurrent requests to external APIs using `Promise.all` directly is a severe denial of service and stability risk when processing large arrays of configuration entities.
 **Prevention:** Introduce and enforce a concurrency limiter (like the `processConcurrent` utility) to batch operations into manageable chunks, limiting the maximum simultaneous connections to the API.
+
+## 2025-02-27 - [Velocity JS Server-Side Template Injection / Prototype Pollution]
+
+**Vulnerability:** The application used `velocityjs` to dynamically evaluate user-provided string templates (e.g. `definition.nameTemplate`) against an internal `entitlement` object. To protect against Sandbox Escape/Prototype pollution, there was a custom AST validation function `hasConstructor` attempting to filter out `constructor`. However, it only filtered `property` or `method` type AST nodes with `id` exactly equal to `constructor`. It failed to check for the `__proto__` property, and completely missed index-based accesses (e.g. `["constructor"]` and `["__proto__"]`), allowing arbitrary code execution and prototype pollution bypasses.
+**Learning:** AST parsing validations must be exhaustively aware of all evaluation mechanics. In JavaScript template engines, bracket/index notation (`object["key"]`) functions identically to dot notation (`object.key`) and can bypass superficial checks. Similarly, protecting `constructor` is insufficient if the `__proto__` property is left unguarded.
+**Prevention:** Extend validation functions that analyze ASTs to filter index-based lookups (`type === 'index'`) in addition to properties, and explicitly block access to `__proto__`, `constructor`, `prototype`, and other prototype-chain-related keywords when parsing untrusted templates.

@@ -26,7 +26,22 @@ function hasConstructor(nodes: any): boolean {
     }
 
     if (typeof nodes === 'object') {
-        if ((nodes.type === 'property' || nodes.type === 'method') && nodes.id === 'constructor') return true
+        // Security Fix: Prevent Sandbox Escape / Prototype Pollution
+        // Block property, method, or index-based access to 'constructor' or '__proto__'
+        if (
+            (nodes.type === 'property' || nodes.type === 'method') &&
+            (nodes.id === 'constructor' || nodes.id === '__proto__')
+        ) {
+            return true
+        }
+
+        if (
+            nodes.type === 'index' &&
+            nodes.id &&
+            (nodes.id.value === 'constructor' || nodes.id.value === '__proto__')
+        ) {
+            return true
+        }
 
         for (const key of Object.keys(nodes)) {
             if (hasConstructor(nodes[key])) return true
