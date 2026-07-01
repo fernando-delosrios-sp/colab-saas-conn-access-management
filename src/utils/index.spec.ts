@@ -1,4 +1,4 @@
-import { areJsonEqual } from './index'
+import { areJsonEqual, getErrorMessage } from './index'
 
 describe('areJsonEqual', () => {
     it('should return true for identical primitive values', () => {
@@ -40,5 +40,42 @@ describe('areJsonEqual', () => {
 
         expect(areJsonEqual(null, 'a')).toBe(false)
         expect(areJsonEqual(undefined, 'a')).toBe(false)
+    })
+})
+
+describe('getErrorMessage', () => {
+    it('should return error.message if error is an instance of Error', () => {
+        const error = new Error('This is an error message')
+        expect(getErrorMessage(error)).toBe('This is an error message')
+    })
+
+    it('should return the stringified message property if error is an object with a message property', () => {
+        const error = { message: 'Object error message' }
+        expect(getErrorMessage(error)).toBe('Object error message')
+    })
+
+    it('should return the string if error is a string', () => {
+        const error = 'String error message'
+        expect(getErrorMessage(error)).toBe('String error message')
+    })
+
+    it('should return "An unknown error occurred" if error is null', () => {
+        expect(getErrorMessage(null)).toBe('An unknown error occurred')
+    })
+
+    it('should return "An unknown error occurred" if error is undefined', () => {
+        expect(getErrorMessage(undefined)).toBe('An unknown error occurred')
+    })
+
+    it('should return "An unknown error occurred" if error is a number', () => {
+        expect(getErrorMessage(42)).toBe('An unknown error occurred')
+    })
+
+    it('should return "An unknown error occurred" if error is a boolean', () => {
+        expect(getErrorMessage(true)).toBe('An unknown error occurred')
+    })
+
+    it('should return "An unknown error occurred" if error is an empty object without a message property', () => {
+        expect(getErrorMessage({})).toBe('An unknown error occurred')
     })
 })
