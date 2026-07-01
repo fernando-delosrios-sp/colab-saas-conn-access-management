@@ -77,6 +77,8 @@ export class ISCClient {
         this.config = new Configuration(conf)
         this.config.retriesConfig = retriesConfig
         this.config.experimental = true
+        // Security enhancement: Add timeout to prevent resource exhaustion from hanging API requests
+        this.config.baseOptions = { ...this.config.baseOptions, timeout: 30000 } // 30 seconds
         axiosRetry(axios as any, retriesConfig)
     }
 
