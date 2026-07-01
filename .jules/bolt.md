@@ -32,3 +32,9 @@
 
 **Learning:** Array sorting (O(n log n)) for simple equality checks creates unnecessary performance overhead in loops. For deep equality on unordered lists, use O(n) frequency maps or Sets.
 **Action:** Use Sets or frequency maps instead of array sorting for array equality comparisons.
+## 2024-07-01 - Resolve N+1 query in role definitions with concurrent processing
+**Learning:**
+Processing large lists of configuration objects (like role assignment definitions) sequentially using `for...of` loops and `await` can introduce severe N+1 blocking network overhead. When these operations fetch network dependencies (e.g. `isc.listEntitlements`), processing time balloons.
+
+**Action:**
+Restructured the definition processing loop to evaluate concurrently using a new custom concurrency batch limiter (`processConcurrent`). This batches network calls into groups without exhausting API rate limits or local sockets, reducing iteration time from ~3000ms down to ~150ms in simulations.

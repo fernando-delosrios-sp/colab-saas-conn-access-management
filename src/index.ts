@@ -25,6 +25,7 @@ import {
     getErrorMessage,
     normalizeAttributes,
     stringToMembership,
+    processConcurrent,
 } from './utils'
 
 export const PROCESSINGWAIT = 60 * 1000
@@ -416,8 +417,10 @@ export const connector = async () => {
 
                 const sourceId = source.id!
 
-                // Process each definition
-                roles: for (const definition of config.roles) {
+                // Process each definition concurrently
+                // ⚡ Bolt: Execute definition processing concurrently using Promise.all
+                // to batch network requests and resolve N+1 sequential blocking.
+                const processDefinition = async (definition: any) => {
                     // ⚡ Bolt: Scope entitlementMap to definition loop to avoid O(n²) redundant re-processing
                     const entitlementMap = new Map<string, EntitlementV2025[]>()
                     logger.debug(`Processing definition: ${definition.name}`)
@@ -497,6 +500,8 @@ export const connector = async () => {
                         }
                     }
                 }
+
+                await processConcurrent(config.roles, 10, processDefinition)
 
                 // ⚡ Bolt: Fetch existing roles concurrently using Promise.all to avoid N+1 sequential blocking
                 logger.debug(`Fetching existing roles for ${roleMap.size} candidates concurrently`)
