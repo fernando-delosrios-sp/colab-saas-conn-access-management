@@ -1,4 +1,4 @@
-import { areJsonEqual } from './index'
+import { areJsonEqual, areEntitlementRefsEqual } from './index'
 
 describe('areJsonEqual', () => {
     it('should return true for identical primitive values', () => {
@@ -40,5 +40,39 @@ describe('areJsonEqual', () => {
 
         expect(areJsonEqual(null, 'a')).toBe(false)
         expect(areJsonEqual(undefined, 'a')).toBe(false)
+    })
+})
+
+describe('areEntitlementRefsEqual', () => {
+    it('should return true for null or undefined arrays', () => {
+        expect(areEntitlementRefsEqual(null, undefined)).toBe(true)
+        expect(areEntitlementRefsEqual(undefined, null as any)).toBe(true)
+        expect(areEntitlementRefsEqual(null, null as any)).toBe(true)
+    })
+
+    it('should return true for empty arrays', () => {
+        expect(areEntitlementRefsEqual([], [])).toBe(true)
+        expect(areEntitlementRefsEqual(null, [])).toBe(true)
+    })
+
+    it('should return true for arrays with same ids in same order', () => {
+        expect(areEntitlementRefsEqual([{ id: '1' }, { id: '2' }], [{ id: '1' }, { id: '2' }])).toBe(true)
+    })
+
+    it('should return true for arrays with same ids in different order', () => {
+        expect(areEntitlementRefsEqual([{ id: '1' }, { id: '2' }], [{ id: '2' }, { id: '1' }])).toBe(true)
+    })
+
+    it('should return false for arrays with different ids', () => {
+        expect(areEntitlementRefsEqual([{ id: '1' }, { id: '2' }], [{ id: '1' }, { id: '3' }])).toBe(false)
+    })
+
+    it('should return false for arrays of different lengths', () => {
+        expect(areEntitlementRefsEqual([{ id: '1' }, { id: '2' }], [{ id: '1' }])).toBe(false)
+    })
+
+    it('should ignore missing or null ids', () => {
+        expect(areEntitlementRefsEqual([{ id: '1' }, { id: null }], [{ id: '1' }])).toBe(true)
+        expect(areEntitlementRefsEqual([{ id: '1' }, {}], [{ id: '1' }])).toBe(true)
     })
 })
