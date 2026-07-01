@@ -1,4 +1,4 @@
-import { areJsonEqual } from './index'
+import { areJsonEqual, escapeFilterString } from './index'
 
 describe('areJsonEqual', () => {
     it('should return true for identical primitive values', () => {
@@ -40,5 +40,32 @@ describe('areJsonEqual', () => {
 
         expect(areJsonEqual(null, 'a')).toBe(false)
         expect(areJsonEqual(undefined, 'a')).toBe(false)
+    })
+})
+
+describe('escapeFilterString', () => {
+    it('should return the original value if falsy', () => {
+        expect(escapeFilterString('')).toBe('')
+        expect(escapeFilterString(null as any)).toBe(null)
+        expect(escapeFilterString(undefined as any)).toBe(undefined)
+    })
+
+    it('should return the original string if it contains no special characters', () => {
+        expect(escapeFilterString('hello world')).toBe('hello world')
+        expect(escapeFilterString('12345')).toBe('12345')
+    })
+
+    it('should escape backslashes', () => {
+        expect(escapeFilterString('C:\\Windows\\System32')).toBe('C:\\\\Windows\\\\System32')
+        expect(escapeFilterString('\\')).toBe('\\\\')
+    })
+
+    it('should escape double quotes', () => {
+        expect(escapeFilterString('hello "world"')).toBe('hello \\"world\\"')
+        expect(escapeFilterString('"')).toBe('\\"')
+    })
+
+    it('should escape both backslashes and double quotes', () => {
+        expect(escapeFilterString('C:\\"Program Files"')).toBe('C:\\\\\\"Program Files\\"')
     })
 })
