@@ -43,3 +43,9 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** The application was validating if `config.baseurl` used HTTPS by simply checking if the string started with `https://`, `http://localhost`, or `http://127.0.0.1`.
 **Learning:** Checking string prefixes for URL validation is easily bypassed. An attacker can supply a domain like `http://localhost.attacker.com` which matches the prefix check (`.startsWith('http://localhost')`), allowing unencrypted transmission of credentials and potentially creating a Server-Side Request Forgery (SSRF) vulnerability.
 **Prevention:** Always use proper URL parsing (e.g., `new URL(config.baseurl)`) to validate URL structure and parts (like `protocol` and `hostname`) rather than relying on substring string manipulation.
+
+## 2025-02-28 - [DoS via Socket Exhaustion in Concurrent Loops]
+
+**Vulnerability:** The application was using unbounded `Promise.all` arrays to perform dozens or hundreds of concurrent API requests (e.g. `isc.getAccessProfileByName`). This causes sudden spikes in network traffic, exhausting available sockets and leading to DoS conditions, timeouts, and API rate limits (HTTP 429).
+**Learning:** Sending unbounded concurrent requests to external APIs using `Promise.all` directly is a severe denial of service and stability risk when processing large arrays of configuration entities.
+**Prevention:** Introduce and enforce a concurrency limiter (like the `processConcurrent` utility) to batch operations into manageable chunks, limiting the maximum simultaneous connections to the API.
