@@ -49,6 +49,7 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** External API calls were being made via `sailpoint-api-client` (which uses `axios` underneath) without an explicit timeout configured in `baseOptions`. Hanging requests from a sluggish or unresponsive downstream API could cause the Node.js application to block workers, consume all available memory and connections, leading to a Denial of Service (DoS).
 **Learning:** Default HTTP client configurations often have no timeout (or a very long one). It's crucial to explicitly define timeouts on API configurations to ensure the application fails fast and releases resources during network or third-party service degradation.
 **Prevention:** Always inject a sane timeout (e.g., 30000ms) into `this.config.baseOptions` when initializing external API clients. Make sure to preserve existing `baseOptions` using spread syntax.
+
 ## 2025-02-28 - [DoS via Socket Exhaustion in Concurrent Loops]
 
 **Vulnerability:** The application was using unbounded `Promise.all` arrays to perform dozens or hundreds of concurrent API requests (e.g. `isc.getAccessProfileByName`). This causes sudden spikes in network traffic, exhausting available sockets and leading to DoS conditions, timeouts, and API rate limits (HTTP 429).
