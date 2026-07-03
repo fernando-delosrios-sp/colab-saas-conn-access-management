@@ -101,12 +101,16 @@ describe('ISCClient', () => {
 
         it('should throw an error when clientId is missing', () => {
             const invalidConfig = { ...mockConfig, clientId: '' }
-            expect(() => new ISCClient(invalidConfig)).toThrow('Security Error: Missing required authentication credentials in configuration')
+            expect(() => new ISCClient(invalidConfig)).toThrow(
+                'Security Error: Missing required authentication credentials in configuration'
+            )
         })
 
         it('should throw an error when clientSecret is missing', () => {
             const invalidConfig = { ...mockConfig, clientSecret: '' }
-            expect(() => new ISCClient(invalidConfig)).toThrow('Security Error: Missing required authentication credentials in configuration')
+            expect(() => new ISCClient(invalidConfig)).toThrow(
+                'Security Error: Missing required authentication credentials in configuration'
+            )
         })
     })
 

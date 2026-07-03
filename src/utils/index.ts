@@ -32,8 +32,7 @@ function isUnsafeVelocityAST(nodes: any): boolean {
             id === '__proto__' ||
             (nodes.type === 'index' &&
                 id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__'))
+                (id.isEval || (id.type === 'string' && (id.value === 'constructor' || id.value === '__proto__'))))
         )
             return true
 
@@ -146,19 +145,6 @@ export const getErrorMessage = (error: unknown): string => {
 export const escapeFilterString = (value: string): string => {
     if (!value) return value
     return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-}
-
-export const processConcurrent = async <T, R>(
-    items: T[],
-    processor: (item: T) => Promise<R>,
-    concurrency: number = 10
-): Promise<R[]> => {
-    const results: R[] = []
-    for (let i = 0; i < items.length; i += concurrency) {
-        const chunk = items.slice(i, i + concurrency)
-        results.push(...(await Promise.all(chunk.map(processor))))
-    }
-    return results
 }
 
 export { stringToMembership }
