@@ -15,21 +15,30 @@ export const normalizeAttributes = (entitlement: EntitlementV2025, _group: strin
     return { ...entitlement, attributes }
 }
 
-function hasConstructor(nodes: any): boolean {
+function isUnsafeVelocityAST(nodes: any): boolean {
     if (!nodes) return false
 
     if (Array.isArray(nodes)) {
         for (const node of nodes) {
-            if (hasConstructor(node)) return true
+            if (isUnsafeVelocityAST(node)) return true
         }
         return false
     }
 
     if (typeof nodes === 'object') {
-        if ((nodes.type === 'property' || nodes.type === 'method') && nodes.id === 'constructor') return true
+        const id = nodes.id
+        if (
+            id === 'constructor' ||
+            id === '__proto__' ||
+            (nodes.type === 'index' &&
+                id &&
+                id.type === 'string' &&
+                (id.value === 'constructor' || id.value === '__proto__'))
+        )
+            return true
 
         for (const key of Object.keys(nodes)) {
-            if (hasConstructor(nodes[key])) return true
+            if (isUnsafeVelocityAST(nodes[key])) return true
         }
     }
 
@@ -45,8 +54,8 @@ export const buildName = (entitlement: EntitlementV2025, definition: Definition)
     let velocity = templateCache.get(definition.nameTemplate)
     if (!velocity) {
         const template = velocityjs.parse(definition.nameTemplate)
-        if (hasConstructor(template)) {
-            throw new Error('Invalid template: access to constructor is not allowed')
+        if (isUnsafeVelocityAST(template)) {
+            throw new Error('Invalid template: access to constructor or __proto__ is not allowed')
         }
         velocity = new velocityjs.Compile(template)
         templateCache.set(definition.nameTemplate, velocity)
@@ -137,6 +146,19 @@ export const getErrorMessage = (error: unknown): string => {
 export const escapeFilterString = (value: string): string => {
     if (!value) return value
     return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+export const processConcurrent = async <T, R>(
+    items: T[],
+    processor: (item: T) => Promise<R>,
+    concurrency: number = 10
+): Promise<R[]> => {
+    const results: R[] = []
+    for (let i = 0; i < items.length; i += concurrency) {
+        const chunk = items.slice(i, i + concurrency)
+        results.push(...(await Promise.all(chunk.map(processor))))
+    }
+    return results
 }
 
 export { stringToMembership }

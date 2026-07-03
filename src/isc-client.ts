@@ -36,7 +36,7 @@ import axiosRetry from 'axios-retry'
 import { TOKEN_URL_PATH } from './data/constants'
 import { Config } from './model/config'
 import { retriesConfig } from './axios'
-import { escapeFilterString } from './utils/index'
+import { escapeFilterString, processConcurrent } from './utils/index'
 
 export class ISCClient {
     private config: Configuration
@@ -77,6 +77,8 @@ export class ISCClient {
         this.config = new Configuration(conf)
         this.config.retriesConfig = retriesConfig
         this.config.experimental = true
+        // Security enhancement: Add timeout to prevent resource exhaustion from hanging API requests
+        this.config.baseOptions = { ...this.config.baseOptions, timeout: 30000 } // 30 seconds
         axiosRetry(axios as any, retriesConfig)
     }
 
@@ -132,6 +134,29 @@ export class ISCClient {
         return response.data[0] ? response.data[0] : undefined
     }
 
+    async getAccessProfilesByNames(names: string[]): Promise<AccessProfileV2025[]> {
+        const api = new AccessProfilesV2025Api(this.config)
+
+        // Chunk names to avoid URI too long errors
+        const chunkSize = 30
+        const chunks: string[][] = []
+        for (let i = 0; i < names.length; i += chunkSize) {
+            chunks.push(names.slice(i, i + chunkSize))
+        }
+
+        const results = await processConcurrent(chunks, async (chunk) => {
+            const escapedNames = chunk.map((name) => `"${escapeFilterString(name)}"`).join(', ')
+            const filters = `name in (${escapedNames})`
+            const requestParameters: AccessProfilesV2025ApiListAccessProfilesRequest = {
+                filters,
+            }
+            const response = await api.listAccessProfiles(requestParameters)
+            return response.data
+        })
+
+        return results.flat()
+    }
+
     async getRoleByName(name: string): Promise<RoleV2025 | undefined> {
         const api = new RolesV2025Api(this.config)
         const filters = `name eq "${escapeFilterString(name)}"`
@@ -140,6 +165,28 @@ export class ISCClient {
         }
         const response = await api.listRoles(requestParameters)
         return response.data[0] ? response.data[0] : undefined
+    }
+
+    async getRolesByNames(names: string[]): Promise<RoleV2025[]> {
+        const api = new RolesV2025Api(this.config)
+
+        const chunkSize = 30
+        const chunks: string[][] = []
+        for (let i = 0; i < names.length; i += chunkSize) {
+            chunks.push(names.slice(i, i + chunkSize))
+        }
+
+        const results = await processConcurrent(chunks, async (chunk) => {
+            const escapedNames = chunk.map((name) => `"${escapeFilterString(name)}"`).join(', ')
+            const filters = `name in (${escapedNames})`
+            const requestParameters: RolesV2025ApiListRolesRequest = {
+                filters,
+            }
+            const response = await api.listRoles(requestParameters)
+            return response.data
+        })
+
+        return results.flat()
     }
 
     async getAppByName(name: string): Promise<SourceAppV2025 | undefined> {
