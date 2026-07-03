@@ -15,21 +15,38 @@ export const normalizeAttributes = (entitlement: EntitlementV2025, _group: strin
     return { ...entitlement, attributes }
 }
 
-function hasConstructor(nodes: any): boolean {
+const UNSAFE_KEYS = ['constructor', '__proto__', 'prototype']
+
+function hasUnsafeAccess(nodes: any): boolean {
     if (!nodes) return false
 
     if (Array.isArray(nodes)) {
         for (const node of nodes) {
-            if (hasConstructor(node)) return true
+            if (hasUnsafeAccess(node)) return true
         }
         return false
     }
 
     if (typeof nodes === 'object') {
-        if ((nodes.type === 'property' || nodes.type === 'method') && nodes.id === 'constructor') return true
+        if (nodes.type === 'property' || nodes.type === 'method') {
+            if (typeof nodes.id === 'string' && UNSAFE_KEYS.includes(nodes.id)) return true
+        }
+
+        if (nodes.type === 'index') {
+            if (nodes.id && nodes.id.type === 'string') {
+                if (UNSAFE_KEYS.includes(nodes.id.value)) return true
+                if (nodes.id.isEval && nodes.id.value.includes('$')) return true
+            } else if (nodes.id && nodes.id.type !== 'integer') {
+                return true
+            }
+        }
+
+        if (nodes.type === 'string' && typeof nodes.value === 'string' && UNSAFE_KEYS.includes(nodes.value)) {
+            return true
+        }
 
         for (const key of Object.keys(nodes)) {
-            if (hasConstructor(nodes[key])) return true
+            if (hasUnsafeAccess(nodes[key])) return true
         }
     }
 
@@ -45,8 +62,8 @@ export const buildName = (entitlement: EntitlementV2025, definition: Definition)
     let velocity = templateCache.get(definition.nameTemplate)
     if (!velocity) {
         const template = velocityjs.parse(definition.nameTemplate)
-        if (hasConstructor(template)) {
-            throw new Error('Invalid template: access to constructor is not allowed')
+        if (hasUnsafeAccess(template)) {
+            throw new Error('Invalid template: access to unsafe properties (e.g., constructor) is not allowed')
         }
         velocity = new velocityjs.Compile(template)
         templateCache.set(definition.nameTemplate, velocity)

@@ -43,3 +43,14 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** The application was validating if `config.baseurl` used HTTPS by simply checking if the string started with `https://`, `http://localhost`, or `http://127.0.0.1`.
 **Learning:** Checking string prefixes for URL validation is easily bypassed. An attacker can supply a domain like `http://localhost.attacker.com` which matches the prefix check (`.startsWith('http://localhost')`), allowing unencrypted transmission of credentials and potentially creating a Server-Side Request Forgery (SSRF) vulnerability.
 **Prevention:** Always use proper URL parsing (e.g., `new URL(config.baseurl)`) to validate URL structure and parts (like `protocol` and `hostname`) rather than relying on substring string manipulation.
+
+## 2025-02-28 - Template Injection via velocityjs Object Access
+
+**Vulnerability:**
+The system uses `velocityjs` to parse user-defined template strings. The previous check (`hasConstructor`) only statically verified that an object's immediate property ID was not exactly `"constructor"`. This logic failed to prevent more sophisticated template injection attacks, such as evaluating strings (`$foo["constructor"]`), accessing `__proto__` or `prototype`, concatenating strings to form unsafe keys (`$foo["construct" + "or"]`), and accessing properties dynamically via variables (`$foo[$prop]`). These vectors allow sandbox escapes, exposing sensitive backend environments (e.g., executing arbitrary code or reading environment variables via `process.env`).
+
+**Learning:**
+Simple, exact string matching on abstract syntax trees (ASTs) is insufficient for security validation, as dynamic languages provide numerous ways to reference the same underlying properties. When relying on templating engines like `velocityjs`, the AST traversal must recursively and robustly check for direct string comparisons, string interpolation, and dynamic index evaluations that can be used to construct unsafe identifiers. Furthermore, blocking `"constructor"` alone is inadequate; `__proto__` and `prototype` must also be blocked to prevent prototype pollution and subsequent sandbox escapes.
+
+**Prevention:**
+Replaced `hasConstructor` with a comprehensive `hasUnsafeAccess` validation function. The new function recursively traverses all node types in the `velocityjs` AST. It blocks `constructor`, `__proto__`, and `prototype` across object properties, methods, dynamic indices (including interpolated string values `nodes.id.isEval`), references, and any standalone strings in the template. If an unsafe access pattern is detected, it throws an error and aborts compilation, effectively neutralizing sandbox escape vectors before the template is executed.
