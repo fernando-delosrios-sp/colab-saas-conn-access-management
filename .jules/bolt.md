@@ -32,3 +32,8 @@
 
 **Learning:** Array sorting (O(n log n)) for simple equality checks creates unnecessary performance overhead in loops. For deep equality on unordered lists, use O(n) frequency maps or Sets.
 **Action:** Use Sets or frequency maps instead of array sorting for array equality comparisons.
+
+## 2026-06-29 - Batching API Lookups with "in" filter
+
+**Learning:** Unbounded sequential API calls within loops or even bounded concurrent single API requests using `name eq "xyz"` can hit rate limits or have a large network overhead when evaluating many items.
+**Action:** Replace concurrent individual calls with batched queries using the `name in ("x", "y")` filter, chunking the list to avoid URL length constraints while drastically reducing network round trips.

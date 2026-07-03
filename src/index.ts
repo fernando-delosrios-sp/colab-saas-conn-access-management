@@ -226,16 +226,15 @@ export const connector = async () => {
                     }
                 }
 
-                // ⚡ Bolt: Fetch existing access profiles concurrently using processConcurrent to avoid N+1 sequential blocking
+                // ⚡ Bolt: Batch fetch existing access profiles to avoid N+1 sequential blocking
                 logger.debug(`Fetching existing access profiles for ${accessProfileMap.size} candidates concurrently`)
                 const apNames = Array.from(accessProfileMap.keys())
-                const existingAps = await processConcurrent(apNames, (name) => isc.getAccessProfileByName(name))
+                const existingAps = await isc.getAccessProfilesByNames(apNames)
 
-                existingAps.forEach((existingAp, index) => {
-                    if (existingAp) {
-                        const name = apNames[index]
-                        existingAccessProfileMap.set(name, existingAp)
-                        const accessProfileProperties = accessProfileMap.get(name)
+                existingAps.forEach((existingAp) => {
+                    if (existingAp && existingAp.name) {
+                        existingAccessProfileMap.set(existingAp.name, existingAp)
+                        const accessProfileProperties = accessProfileMap.get(existingAp.name)
                         if (accessProfileProperties) {
                             accessProfileProperties.id = existingAp.id
                         }
@@ -489,16 +488,15 @@ export const connector = async () => {
                     }
                 }
 
-                // ⚡ Bolt: Fetch existing roles concurrently using processConcurrent to avoid N+1 sequential blocking
+                // ⚡ Bolt: Batch fetch existing roles to avoid N+1 sequential blocking
                 logger.debug(`Fetching existing roles for ${roleMap.size} candidates concurrently`)
                 const roleNames = Array.from(roleMap.keys())
-                const existingRoles = await processConcurrent(roleNames, (name) => isc.getRoleByName(name))
+                const existingRoles = await isc.getRolesByNames(roleNames)
 
-                existingRoles.forEach((existingRole, index) => {
-                    if (existingRole) {
-                        const name = roleNames[index]
-                        existingRoleMap.set(name, existingRole)
-                        const roleProperties = roleMap.get(name)
+                existingRoles.forEach((existingRole) => {
+                    if (existingRole && existingRole.name) {
+                        existingRoleMap.set(existingRole.name, existingRole)
+                        const roleProperties = roleMap.get(existingRole.name)
                         if (roleProperties) {
                             roleProperties.id = existingRole.id
                         }
