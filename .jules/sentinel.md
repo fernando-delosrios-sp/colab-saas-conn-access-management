@@ -44,6 +44,13 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Learning:** Checking string prefixes for URL validation is easily bypassed. An attacker can supply a domain like `http://localhost.attacker.com` which matches the prefix check (`.startsWith('http://localhost')`), allowing unencrypted transmission of credentials and potentially creating a Server-Side Request Forgery (SSRF) vulnerability.
 **Prevention:** Always use proper URL parsing (e.g., `new URL(config.baseurl)`) to validate URL structure and parts (like `protocol` and `hostname`) rather than relying on substring string manipulation.
 
+## 2025-07-01 - Prevent Unencrypted Transmission of Credentials
+
+**Vulnerability:** The application previously permitted insecure communication via `http://localhost` and `http://127.0.0.1` exceptions when validating the `baseurl` in `ISCClient`. While seemingly benign for local development, allowing unencrypted HTTP transmission can expose sensitive configuration parameters, like `clientId` and `clientSecret`, during potentially misconfigured or unauthorized local connections, presenting a security risk.
+
+**Learning:** Exceptions in security enforcement policies, such as allowing HTTP for local environments, often become vulnerabilities or can be bypassed if the environment behaves unexpectedly or in cases of configuration drift. We must strictly enforce HTTPS for all secure communication layers without exception in production-ready services.
+
+**Prevention:** We have completely removed the HTTP exceptions from the `baseurl` validation logic. The URL scheme is now exclusively required to be `https:`. The URL validation tests were also updated to verify this rule.
 ## 2025-02-28 - [Resource Exhaustion Risk in External API Calls]
 
 **Vulnerability:** External API calls were being made via `sailpoint-api-client` (which uses `axios` underneath) without an explicit timeout configured in `baseOptions`. Hanging requests from a sluggish or unresponsive downstream API could cause the Node.js application to block workers, consume all available memory and connections, leading to a Denial of Service (DoS).

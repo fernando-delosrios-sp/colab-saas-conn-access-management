@@ -35,6 +35,48 @@ describe('ISCClient', () => {
     })
 
     describe('constructor', () => {
+        it('should throw an error if the baseurl is http://localhost', () => {
+            const mockConfigHttp = {
+                baseurl: 'http://localhost',
+                clientId: 'client-id',
+                clientSecret: 'client-secret',
+                spConnectorInstanceId: 'instance-1',
+                spConnectorSpecId: 'spec-1',
+                spConnectorSupportsCustomSchemas: false,
+            }
+            expect(() => new ISCClient(mockConfigHttp)).toThrow(
+                'Security Error: baseurl must use https:// to prevent unencrypted transmission of credentials'
+            )
+        })
+
+        it('should throw an error if the baseurl is http://127.0.0.1', () => {
+            const mockConfigHttp = {
+                baseurl: 'http://127.0.0.1',
+                clientId: 'client-id',
+                clientSecret: 'client-secret',
+                spConnectorInstanceId: 'instance-1',
+                spConnectorSpecId: 'spec-1',
+                spConnectorSupportsCustomSchemas: false,
+            }
+            expect(() => new ISCClient(mockConfigHttp)).toThrow(
+                'Security Error: baseurl must use https:// to prevent unencrypted transmission of credentials'
+            )
+        })
+
+        it('should throw an error if the baseurl is invalid', () => {
+            const mockConfigInvalid = {
+                baseurl: 'not-a-url',
+                clientId: 'client-id',
+                clientSecret: 'client-secret',
+                spConnectorInstanceId: 'instance-1',
+                spConnectorSpecId: 'spec-1',
+                spConnectorSupportsCustomSchemas: false,
+            }
+            expect(() => new ISCClient(mockConfigInvalid)).toThrow(
+                'Security Error: baseurl must use https:// to prevent unencrypted transmission of credentials'
+            )
+        })
+
         it('should initialize Configuration with correct parameters', () => {
             // Re-instantiate to test the constructor mock properly
             const mockConfigConst = {
