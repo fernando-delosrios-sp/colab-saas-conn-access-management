@@ -26,7 +26,6 @@ import {
     normalizeAttributes,
     processConcurrent,
     stringToMembership,
-    processConcurrent,
 } from './utils'
 
 export const PROCESSINGWAIT = 60 * 1000
@@ -417,6 +416,16 @@ export const connector = async () => {
 
                 const sourceId = source.id!
 
+                // ⚡ Bolt: Pre-fetch entitlements for all role definition queries concurrently
+                const uniqueRoleQueries = Array.from(new Set(config.roles.map((d) => d.query)))
+                logger.debug(`Pre-fetching entitlements for ${uniqueRoleQueries.length} unique role queries`)
+                const roleQueryResults = await processConcurrent(uniqueRoleQueries, async (query) => {
+                    const entitlements = await isc.listEntitlements(query)
+                    return { query, entitlements }
+                })
+                const roleQueryToEntitlementsMap = new Map<string, EntitlementV2025[]>()
+                roleQueryResults.forEach((res) => roleQueryToEntitlementsMap.set(res.query, res.entitlements))
+
                 // Process each definition
                 roles: for (const definition of config.roles) {
                     // ⚡ Bolt: Scope entitlementMap to definition loop to avoid O(n²) redundant re-processing
@@ -430,7 +439,7 @@ export const connector = async () => {
                         roleMembership = await stringToMembership(definition.assignmentDefinition, sources)
                     }
 
-                    const entitlements = await isc.listEntitlements(definition.query)
+                    const entitlements = roleQueryToEntitlementsMap.get(definition.query) || []
                     logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
                     // Get entitlements, access profiles, and applications from each entitlement found
                     entitlements: for (let entitlement of entitlements) {
