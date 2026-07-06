@@ -27,6 +27,7 @@ import {
     SourceAppV2025,
     SourcesApi,
     SourcesV2025Api,
+    SourcesV2025ApiListSourcesRequest,
 } from 'sailpoint-api-client'
 import axios from 'axios'
 import axiosRetry from 'axios-retry'
@@ -148,7 +149,7 @@ export class ISCClient {
             return response.data
         })
 
-        return results.flat()
+        return results.flat() as any
     }
 
     async getRoleByName(name: string): Promise<RoleV2025 | undefined> {
@@ -180,7 +181,27 @@ export class ISCClient {
             return response.data
         })
 
-        return results.flat()
+        return results.flat() as any
+    }
+
+    async getAppsByNames(names: string[]): Promise<SourceAppV2025[]> {
+        const api = new AppsV2025Api(this.config)
+        const chunkSize = 30
+        const chunks: string[][] = []
+        for (let i = 0; i < names.length; i += chunkSize) {
+            chunks.push(names.slice(i, i + chunkSize))
+        }
+
+        const results = await processConcurrent(chunks, async (chunk) => {
+            const escapedNames = chunk.map((name) => `"${escapeFilterString(name)}"`).join(', ')
+            const filters = `name in (${escapedNames})`
+            const requestParameters: AppsV2025ApiListAllSourceAppRequest = {
+                filters,
+            }
+            const response = await api.listAllSourceApp(requestParameters)
+            return response.data
+        })
+        return results.flat() as any
     }
 
     async getAppByName(name: string): Promise<SourceAppV2025 | undefined> {
@@ -217,6 +238,26 @@ export class ISCClient {
         return this.patchResource<SourceAppV2025>(AppsV2025Api, 'patchSourceApp', id, jsonPatchOperationV2025, {
             xSailPointExperimental: 'true',
         })
+    }
+
+    async getSourcesByIds(ids: string[]): Promise<SourceAppV2025[]> {
+        const api = new SourcesV2025Api(this.config)
+        const chunkSize = 30
+        const chunks: string[][] = []
+        for (let i = 0; i < ids.length; i += chunkSize) {
+            chunks.push(ids.slice(i, i + chunkSize))
+        }
+
+        const results = await processConcurrent(chunks, async (chunk) => {
+            const escapedIds = chunk.map((id) => `"${escapeFilterString(id)}"`).join(', ')
+            const filters = `id in (${escapedIds})`
+            const requestParameters: SourcesV2025ApiListSourcesRequest = {
+                filters,
+            }
+            const response = await api.listSources(requestParameters)
+            return response.data
+        })
+        return results.flat() as any
     }
 
     async getSource(id: string): Promise<SourceAppV2025> {

@@ -26,7 +26,6 @@ import {
     normalizeAttributes,
     processConcurrent,
     stringToMembership,
-    processConcurrent,
 } from './utils'
 
 export const PROCESSINGWAIT = 60 * 1000
@@ -158,20 +157,26 @@ export const connector = async () => {
                             `Pre-fetching ${sourcesToFetch.size} sources and ${appsToFetch.size} apps concurrently`
                         )
                     }
-                    const fetchedApps = await processConcurrent(Array.from(appsToFetch), async (appName) => {
-                        const app = await isc.getAppByName(appName)
-                        return { appName, app }
-                    })
-                    await processConcurrent(Array.from(sourcesToFetch), async (sId) => {
-                        const source = await isc.getSource(sId)
-                        if (source.owner?.id) {
-                            sourceOwnerMap.set(sId, source.owner.id)
+                    // Bolt: Batch API lookups with "in" filter for apps
+                    const appsToFetchArray = Array.from(appsToFetch)
+                    const fetchedAppsArray =
+                        appsToFetchArray.length > 0 ? await isc.getAppsByNames(appsToFetchArray) : []
+                    const prefetchedApps = new Map<string, SourceAppV2025 | undefined>()
+                    // Add nulls for apps not found to match existing logic
+                    appsToFetchArray.forEach((appName) => prefetchedApps.set(appName, undefined))
+                    fetchedAppsArray.forEach((app) => {
+                        if (app.name) {
+                            prefetchedApps.set(app.name, app)
                         }
                     })
-
-                    const prefetchedApps = new Map<string, SourceAppV2025 | undefined>()
-                    fetchedApps.forEach(({ appName, app }) => {
-                        prefetchedApps.set(appName, app)
+                    // Bolt: Batch API lookups with "in" filter for sources
+                    const sourcesToFetchArray = Array.from(sourcesToFetch)
+                    const fetchedSourcesArray =
+                        sourcesToFetchArray.length > 0 ? await isc.getSourcesByIds(sourcesToFetchArray) : []
+                    fetchedSourcesArray.forEach((source) => {
+                        if (source.id && source.owner?.id) {
+                            sourceOwnerMap.set(source.id, source.owner.id)
+                        }
                     })
 
                     groups: for (const groupName of entitlementMap.keys()) {
