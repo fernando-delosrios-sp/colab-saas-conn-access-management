@@ -30,10 +30,15 @@ function isUnsafeVelocityAST(nodes: any): boolean {
         if (
             id === 'constructor' ||
             id === '__proto__' ||
+            id === 'prototype' ||
             (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__'))
+                (id === undefined ||
+                    (id.type !== 'string' && id.type !== 'integer') ||
+                    id.value === 'constructor' ||
+                    id.value === '__proto__' ||
+                    id.value === 'prototype' ||
+                    id.isEval)) ||
+            (nodes.type === 'method' && id === 'evaluate')
         )
             return true
 
@@ -55,7 +60,9 @@ export const buildName = (entitlement: EntitlementV2025, definition: Definition)
     if (!velocity) {
         const template = velocityjs.parse(definition.nameTemplate)
         if (isUnsafeVelocityAST(template)) {
-            throw new Error('Invalid template: access to constructor or __proto__ is not allowed')
+            throw new Error(
+                'Invalid template: access to constructor, __proto__, prototype, or evaluation macros is not allowed'
+            )
         }
         velocity = new velocityjs.Compile(template)
         templateCache.set(definition.nameTemplate, velocity)
@@ -146,19 +153,6 @@ export const getErrorMessage = (error: unknown): string => {
 export const escapeFilterString = (value: string): string => {
     if (!value) return value
     return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-}
-
-export const processConcurrent = async <T, R>(
-    items: T[],
-    processor: (item: T) => Promise<R>,
-    concurrency: number = 10
-): Promise<R[]> => {
-    const results: R[] = []
-    for (let i = 0; i < items.length; i += concurrency) {
-        const chunk = items.slice(i, i + concurrency)
-        results.push(...(await Promise.all(chunk.map(processor))))
-    }
-    return results
 }
 
 export { stringToMembership }

@@ -51,6 +51,7 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Learning:** Exceptions in security enforcement policies, such as allowing HTTP for local environments, often become vulnerabilities or can be bypassed if the environment behaves unexpectedly or in cases of configuration drift. We must strictly enforce HTTPS for all secure communication layers without exception in production-ready services.
 
 **Prevention:** We have completely removed the HTTP exceptions from the `baseurl` validation logic. The URL scheme is now exclusively required to be `https:`. The URL validation tests were also updated to verify this rule.
+
 ## 2025-02-28 - [Resource Exhaustion Risk in External API Calls]
 
 **Vulnerability:** External API calls were being made via `sailpoint-api-client` (which uses `axios` underneath) without an explicit timeout configured in `baseOptions`. Hanging requests from a sluggish or unresponsive downstream API could cause the Node.js application to block workers, consume all available memory and connections, leading to a Denial of Service (DoS).
@@ -62,7 +63,15 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** The application was using unbounded `Promise.all` arrays to perform dozens or hundreds of concurrent API requests (e.g. `isc.getAccessProfileByName`). This causes sudden spikes in network traffic, exhausting available sockets and leading to DoS conditions, timeouts, and API rate limits (HTTP 429).
 **Learning:** Sending unbounded concurrent requests to external APIs using `Promise.all` directly is a severe denial of service and stability risk when processing large arrays of configuration entities.
 **Prevention:** Introduce and enforce a concurrency limiter (like the `processConcurrent` utility) to batch operations into manageable chunks, limiting the maximum simultaneous connections to the API.
+
 ## 2024-05-24 - [Velocity Template Sandbox Escape Mitigation]
+
 **Vulnerability:** The existing `hasConstructor` validation for Velocity templates in `src/utils/index.ts` only blocked access to the `constructor` property when referenced as an identifier. It failed to prevent access to `__proto__` and also missed index-based accesses (e.g., `['constructor']` or `['__proto__']`). This could allow Sandbox Escapes or Prototype Pollution in `velocityjs`.
 **Learning:** AST-based validation for template engines must explicitly check for property access through index notation (strings in brackets) as well as direct identifiers. Checking only `.constructor` is insufficient because an attacker can easily bypass it with `['constructor']`.
 **Prevention:** The validation logic must recursively inspect AST nodes to explicitly block `__proto__` and ensure that `index` nodes with string values are checked for banned properties alongside standard `property` and `method` nodes.
+
+## 2024-07-06 - Velocityjs Prototype Pollution and Sandbox Escape Bypass
+
+**Vulnerability:** The previous velocity template validator `isUnsafeVelocityAST` only blocked direct property access for `constructor` and `__proto__`. It missed bypasses using `prototype`, index-based property access (e.g., `['constructor']` or dynamic variable indexing like `[$x]`), and explicit evaluation macros like `#evaluate()`. This allowed attackers to escape the restricted AST context and execute arbitrary JS.
+**Learning:** Checking for object traversal requires a comprehensive approach covering not just property nodes (`nodes.id === 'xyz'`), but also index nodes (`nodes.type === 'index'`), and dynamic evaluations (`id.isEval` or `#evaluate` macros).
+**Prevention:** Block all non-string or dynamically evaluated index-based property access. Explicitly check for evaluation macros and expand the blocklist of unsafe properties to include `prototype`.
