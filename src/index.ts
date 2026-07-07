@@ -26,7 +26,6 @@ import {
     normalizeAttributes,
     processConcurrent,
     stringToMembership,
-    processConcurrent,
 } from './utils'
 
 export const PROCESSINGWAIT = 60 * 1000
@@ -158,10 +157,9 @@ export const connector = async () => {
                             `Pre-fetching ${sourcesToFetch.size} sources and ${appsToFetch.size} apps concurrently`
                         )
                     }
-                    const fetchedApps = await processConcurrent(Array.from(appsToFetch), async (appName) => {
-                        const app = await isc.getAppByName(appName)
-                        return { appName, app }
-                    })
+                    const appNamesToFetch = Array.from(appsToFetch)
+                    const fetchedApps = appNamesToFetch.length > 0 ? await isc.getAppsByNames(appNamesToFetch) : []
+
                     await processConcurrent(Array.from(sourcesToFetch), async (sId) => {
                         const source = await isc.getSource(sId)
                         if (source.owner?.id) {
@@ -170,8 +168,16 @@ export const connector = async () => {
                     })
 
                     const prefetchedApps = new Map<string, SourceAppV2025 | undefined>()
-                    fetchedApps.forEach(({ appName, app }) => {
-                        prefetchedApps.set(appName, app)
+                    fetchedApps.forEach((app) => {
+                        if (app && app.name) {
+                            prefetchedApps.set(app.name, app)
+                        }
+                    })
+                    // Ensure requested apps that were not found are also stored to avoid cache misses
+                    appNamesToFetch.forEach((appName) => {
+                        if (!prefetchedApps.has(appName)) {
+                            prefetchedApps.set(appName, undefined)
+                        }
                     })
 
                     groups: for (const groupName of entitlementMap.keys()) {
