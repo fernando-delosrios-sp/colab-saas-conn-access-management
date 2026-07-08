@@ -27,15 +27,31 @@ function isUnsafeVelocityAST(nodes: any): boolean {
 
     if (typeof nodes === 'object') {
         const id = nodes.id
+        // Security enhancement: Block prototype pollution and sandbox escape via
+        // prototype, macro evaluation, and dynamic/string indexing
         if (
             id === 'constructor' ||
             id === '__proto__' ||
+            id === 'prototype' ||
+            (nodes.type === 'macro_call' && id === 'evaluate') ||
+            (nodes.isEval &&
+                nodes.type === 'string' &&
+                nodes.value &&
+                (nodes.value.includes('constructor') ||
+                    nodes.value.includes('__proto__') ||
+                    nodes.value.includes('prototype'))) ||
             (nodes.type === 'index' &&
                 id &&
                 id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__'))
-        )
+                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype')) ||
+            (nodes.type === 'index' &&
+                id &&
+                id.type === 'references' &&
+                id.id &&
+                (id.id === 'constructor' || id.id === '__proto__' || id.id === 'prototype'))
+        ) {
             return true
+        }
 
         for (const key of Object.keys(nodes)) {
             if (isUnsafeVelocityAST(nodes[key])) return true
@@ -162,23 +178,3 @@ export const processConcurrent = async <T, R>(
 }
 
 export { stringToMembership }
-
-export const processConcurrent = async <T, R>(
-    items: T[],
-    fn: (item: T) => Promise<R>,
-    concurrencyLimit: number = 10
-): Promise<R[]> => {
-    const results: R[] = new Array(items.length)
-    let i = 0
-
-    const execute = async () => {
-        while (i < items.length) {
-            const index = i++
-            results[index] = await fn(items[index])
-        }
-    }
-
-    const workers = Array.from({ length: Math.min(concurrencyLimit, items.length) }, () => execute())
-    await Promise.all(workers)
-    return results
-}
