@@ -183,6 +183,28 @@ export class ISCClient {
         return results.flat()
     }
 
+    async getAppsByNames(names: string[]): Promise<SourceAppV2025[]> {
+        const api = new AppsV2025Api(this.config)
+
+        const chunkSize = 30
+        const chunks: string[][] = []
+        for (let i = 0; i < names.length; i += chunkSize) {
+            chunks.push(names.slice(i, i + chunkSize))
+        }
+
+        const results = await processConcurrent(chunks, async (chunk) => {
+            const escapedNames = chunk.map((name) => `"${escapeFilterString(name)}"`).join(', ')
+            const filters = `name in (${escapedNames})`
+            const requestParameters: AppsV2025ApiListAllSourceAppRequest = {
+                filters,
+            }
+            const response = await api.listAllSourceApp(requestParameters)
+            return response.data
+        })
+
+        return results.flat()
+    }
+
     async getAppByName(name: string): Promise<SourceAppV2025 | undefined> {
         const api = new AppsV2025Api(this.config)
         const filters = `name eq "${escapeFilterString(name)}"`
