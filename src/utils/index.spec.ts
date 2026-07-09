@@ -1,4 +1,46 @@
-import { areJsonEqual, getErrorMessage } from './index'
+import { areJsonEqual, getErrorMessage, buildName } from './index'
+
+describe('buildName security validations', () => {
+    const mockEntitlement = {
+        id: '1',
+        name: 'test',
+        type: 'ENTITLEMENT',
+        attributes: {},
+    } as any
+
+    it('should throw an error when accessing constructor', () => {
+        const definition = { nameTemplate: "$map['constructor']" } as any
+        expect(() => buildName(mockEntitlement, definition)).toThrow(
+            'Invalid template: access to constructor, __proto__, prototype, or #evaluate is not allowed'
+        )
+    })
+
+    it('should throw an error when accessing __proto__', () => {
+        const definition = { nameTemplate: "$map['__proto__']" } as any
+        expect(() => buildName(mockEntitlement, definition)).toThrow(
+            'Invalid template: access to constructor, __proto__, prototype, or #evaluate is not allowed'
+        )
+    })
+
+    it('should throw an error when accessing prototype', () => {
+        const definition = { nameTemplate: "$map['prototype']" } as any
+        expect(() => buildName(mockEntitlement, definition)).toThrow(
+            'Invalid template: access to constructor, __proto__, prototype, or #evaluate is not allowed'
+        )
+    })
+
+    it('should throw an error when using #evaluate macro', () => {
+        const definition = { nameTemplate: "#evaluate('1+1')" } as any
+        expect(() => buildName(mockEntitlement, definition)).toThrow(
+            'Invalid template: access to constructor, __proto__, prototype, or #evaluate is not allowed'
+        )
+    })
+
+    it('should not throw an error for valid property access', () => {
+        const definition = { nameTemplate: "$map['safe']" } as any
+        expect(() => buildName(mockEntitlement, definition)).not.toThrow()
+    })
+})
 
 describe('areJsonEqual', () => {
     it('should return true for identical primitive values', () => {
