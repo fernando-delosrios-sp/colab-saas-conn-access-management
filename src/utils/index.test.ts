@@ -73,3 +73,22 @@ test('buildName should handle conditionals in template', () => {
     const result = buildName(mockEntitlement, mockDefinition)
     assert.strictEqual(result, 'Contractor')
 })
+
+test('buildName should throw error for unsafe templates using prototype or #evaluate', () => {
+    const mockEntitlement = {
+        attributes: {
+            prop: 'value',
+        },
+    } as any
+
+    const unsafeTemplates = ['#evaluate($prop)', '$prop.prototype', '$prop["prototype"]']
+
+    for (const nameTemplate of unsafeTemplates) {
+        const mockDefinition = { nameTemplate } as any
+        assert.throws(
+            () => buildName(mockEntitlement, mockDefinition),
+            /Invalid template: access to constructor, __proto__, prototype or #evaluate is not allowed/,
+            `Should block: ${nameTemplate}`
+        )
+    }
+})
