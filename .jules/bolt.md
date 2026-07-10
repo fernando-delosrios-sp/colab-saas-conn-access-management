@@ -40,3 +40,7 @@
 
 **Learning:** Unbounded sequential API calls within loops or even bounded concurrent single API requests using `name eq "xyz"` can hit rate limits or have a large network overhead when evaluating many items.
 **Action:** Replace concurrent individual calls with batched queries using the `name in ("x", "y")` filter, chunking the list to avoid URL length constraints while drastically reducing network round trips.
+## 2026-07-10 - Worker-pool Model for Batch I/O Operations
+
+**Learning:** When using chunked `Promise.all` for concurrency (e.g. `processConcurrent`), the entire chunk must complete before the next chunk can start. This causes "head-of-line" blocking where one slow API request delays the processing of all other items in subsequent chunks, reducing network throughput.
+**Action:** Utilize a worker-pool model instead. By spinning up a fixed number of workers that continuously pull from the queue, idle workers can immediately process new items as soon as they finish their current task, ensuring smoother and higher network I/O throughput.
