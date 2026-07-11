@@ -26,7 +26,6 @@ import {
     normalizeAttributes,
     processConcurrent,
     stringToMembership,
-    processConcurrent,
 } from './utils'
 
 export const PROCESSINGWAIT = 60 * 1000
