@@ -34,9 +34,16 @@
 **Action:** Use Sets or frequency maps instead of array sorting for array equality comparisons.
 
 ## 2026-07-01 - Prevent N+1 API query bottlenecks in Entitlement Fetching
+
 **Learning:** Sequential processing in loops of remote data fetches leads to N+1 API query bottlenecks which impact application performance. In this connector SDK context, fetching entitlements in a sequential manner per access profile definition resulted in poor throughput.
 **Action:** Batched network requests by extracting unique queries into Sets and fetching them concurrently using a concurrency limiter utility (`processConcurrent`) with `Promise.all` before iteration begins.
+
 ## 2026-06-29 - Batching API Lookups with "in" filter
 
 **Learning:** Unbounded sequential API calls within loops or even bounded concurrent single API requests using `name eq "xyz"` can hit rate limits or have a large network overhead when evaluating many items.
 **Action:** Replace concurrent individual calls with batched queries using the `name in ("x", "y")` filter, chunking the list to avoid URL length constraints while drastically reducing network round trips.
+
+## 2024-07-01 - Worker-pool pattern for batch API requests
+
+**Learning:** Using a chunked `Promise.all` approach for concurrent operations can cause "head-of-line" blocking, where the entire chunk waits for the slowest request to complete before processing the next chunk.
+**Action:** Replace chunked `Promise.all` loops with a worker-pool concurrency model. This allows idle workers to instantly pull and process the next item in the queue, eliminating idle waiting and increasing throughput for network I/O bound operations.
