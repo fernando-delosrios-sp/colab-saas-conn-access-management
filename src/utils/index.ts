@@ -27,13 +27,18 @@ function isUnsafeVelocityAST(nodes: any): boolean {
 
     if (typeof nodes === 'object') {
         const id = nodes.id
+
+        // Block macro evaluation logic
+        if (nodes.type === 'macro_call' && id === 'evaluate') return true
+
         if (
             id === 'constructor' ||
             id === '__proto__' ||
+            id === 'prototype' ||
             (nodes.type === 'index' &&
                 id &&
                 id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__'))
+                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
         )
             return true
 
@@ -55,7 +60,7 @@ export const buildName = (entitlement: EntitlementV2025, definition: Definition)
     if (!velocity) {
         const template = velocityjs.parse(definition.nameTemplate)
         if (isUnsafeVelocityAST(template)) {
-            throw new Error('Invalid template: access to constructor or __proto__ is not allowed')
+            throw new Error('Invalid template: access to constructor, __proto__, or prototype is not allowed')
         }
         velocity = new velocityjs.Compile(template)
         templateCache.set(definition.nameTemplate, velocity)
@@ -162,23 +167,3 @@ export const processConcurrent = async <T, R>(
 }
 
 export { stringToMembership }
-
-export const processConcurrent = async <T, R>(
-    items: T[],
-    fn: (item: T) => Promise<R>,
-    concurrencyLimit: number = 10
-): Promise<R[]> => {
-    const results: R[] = new Array(items.length)
-    let i = 0
-
-    const execute = async () => {
-        while (i < items.length) {
-            const index = i++
-            results[index] = await fn(items[index])
-        }
-    }
-
-    const workers = Array.from({ length: Math.min(concurrencyLimit, items.length) }, () => execute())
-    await Promise.all(workers)
-    return results
-}
