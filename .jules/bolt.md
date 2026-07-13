@@ -42,6 +42,11 @@
 
 **Learning:** Unbounded sequential API calls within loops or even bounded concurrent single API requests using `name eq "xyz"` can hit rate limits or have a large network overhead when evaluating many items.
 **Action:** Replace concurrent individual calls with batched queries using the `name in ("x", "y")` filter, chunking the list to avoid URL length constraints while drastically reducing network round trips.
+
+## 2024-07-01 - Worker-pool pattern for batch API requests
+
+**Learning:** Using a chunked `Promise.all` approach for concurrent operations can cause "head-of-line" blocking, where the entire chunk waits for the slowest request to complete before processing the next chunk.
+**Action:** Replace chunked `Promise.all` loops with a worker-pool concurrency model. This allows idle workers to instantly pull and process the next item in the queue, eliminating idle waiting and increasing throughput for network I/O bound operations.
 ## $(date +%Y-%m-%d) - Pre-fetch entitlements for role definition queries concurrently
 **Learning:** During role processing, iterating sequentially over role definitions and executing API queries inside the loop (`await isc.listEntitlements(definition.query)`) creates a massive N+1 query bottleneck, exacerbating network latency and slowing down execution.
 **Action:** Always pre-fetch nested dependencies in batches using a concurrency limiter (like `processConcurrent`) before entering inner loops, caching the results in a Map or Set to replace network I/O with O(1) memory lookups.
