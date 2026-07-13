@@ -157,10 +157,9 @@ export const connector = async () => {
                             `Pre-fetching ${sourcesToFetch.size} sources and ${appsToFetch.size} apps concurrently`
                         )
                     }
-                    const fetchedApps = await processConcurrent(Array.from(appsToFetch), async (appName) => {
-                        const app = await isc.getAppByName(appName)
-                        return { appName, app }
-                    })
+                    // ⚡ Bolt: Batch API lookup for apps to eliminate N+1 queries during pre-fetching
+                    const fetchedAppsData = await isc.getAppsByNames(Array.from(appsToFetch))
+
                     await processConcurrent(Array.from(sourcesToFetch), async (sId) => {
                         const source = await isc.getSource(sId)
                         if (source.owner?.id) {
@@ -169,8 +168,13 @@ export const connector = async () => {
                     })
 
                     const prefetchedApps = new Map<string, SourceAppV2025 | undefined>()
-                    fetchedApps.forEach(({ appName, app }) => {
-                        prefetchedApps.set(appName, app)
+                    for (const appName of appsToFetch) {
+                        prefetchedApps.set(appName, undefined)
+                    }
+                    fetchedAppsData.forEach((app) => {
+                        if (app.name) {
+                            prefetchedApps.set(app.name, app)
+                        }
                     })
 
                     groups: for (const groupName of entitlementMap.keys()) {
