@@ -262,27 +262,7 @@ export const connector = async () => {
                     if (id) {
                         logger.debug(`Evaluating existing access profile for update: ${apName}`)
                         const existingAp = existingAccessProfileMap.get(apName)
-                        const accessProfileUpdate: JsonPatchOperationV2025[] = [
-                            {
-                                op: 'replace',
-                                path: '/entitlements',
-                                value: entitlements,
-                            },
-                        ]
-                        if (requestable) {
-                            accessProfileUpdate.push({
-                                op: 'replace',
-                                path: '/requestable',
-                                value: true,
-                            })
-                        }
-                        if (accessRequestConfig) {
-                            accessProfileUpdate.push({
-                                op: 'replace',
-                                path: '/accessRequestConfig',
-                                value: accessRequestConfig,
-                            })
-                        }
+                        let accessProfileUpdate: JsonPatchOperationV2025[] = []
 
                         if (existingAp) {
                             const entitlementsChanged = !areEntitlementRefsEqual(existingAp.entitlements, entitlements)
@@ -294,6 +274,46 @@ export const connector = async () => {
                             if (!entitlementsChanged && !requestableChanged && !accessRequestConfigChanged) {
                                 logger.debug(`No changes detected for access profile ${apName}, skipping update`)
                                 return
+                            }
+
+                            if (entitlementsChanged) {
+                                accessProfileUpdate.push({ op: 'replace', path: '/entitlements', value: entitlements })
+                            }
+                            if (requestableChanged) {
+                                if (requestable) {
+                                    accessProfileUpdate.push({ op: 'replace', path: '/requestable', value: true })
+                                } else {
+                                    accessProfileUpdate.push({ op: 'replace', path: '/requestable', value: false })
+                                }
+                            }
+                            if (accessRequestConfigChanged) {
+                                if (accessRequestConfig) {
+                                    accessProfileUpdate.push({
+                                        op: 'replace',
+                                        path: '/accessRequestConfig',
+                                        value: accessRequestConfig,
+                                    })
+                                } else {
+                                    accessProfileUpdate.push({ op: 'remove', path: '/accessRequestConfig' })
+                                }
+                            }
+                        } else {
+                            accessProfileUpdate = [
+                                {
+                                    op: 'replace',
+                                    path: '/entitlements',
+                                    value: entitlements,
+                                },
+                            ]
+                            if (requestable) {
+                                accessProfileUpdate.push({ op: 'replace', path: '/requestable', value: true })
+                            }
+                            if (accessRequestConfig) {
+                                accessProfileUpdate.push({
+                                    op: 'replace',
+                                    path: '/accessRequestConfig',
+                                    value: accessRequestConfig,
+                                })
                             }
                         }
 
@@ -343,33 +363,7 @@ export const connector = async () => {
                     }
 
                     logger.debug(`Evaluating application ${appName} for update`)
-                    const updateApplication: JsonPatchOperationV2025[] = [
-                        {
-                            op: 'replace',
-                            path: '/accessProfiles',
-                            value: accessProfiles,
-                        },
-                        {
-                            op: 'replace',
-                            path: '/enabled',
-                            value: true,
-                        },
-                        {
-                            op: 'replace',
-                            path: '/appCenterEnabled',
-                            value: true,
-                        },
-                        {
-                            op: 'replace',
-                            path: '/provisionRequestEnabled',
-                            value: true,
-                        },
-                        {
-                            op: 'replace',
-                            path: '/matchAllAccounts',
-                            value: false,
-                        },
-                    ]
+                    let updateApplication: JsonPatchOperationV2025[] = []
 
                     if (existingApp) {
                         const accessProfilesChanged = !areStringArraysEqual(
@@ -391,6 +385,24 @@ export const connector = async () => {
                             logger.debug(`No changes detected for app ${appName}, skipping update`)
                             return
                         }
+
+                        if (accessProfilesChanged)
+                            updateApplication.push({ op: 'replace', path: '/accessProfiles', value: accessProfiles })
+                        if (enabledChanged) updateApplication.push({ op: 'replace', path: '/enabled', value: true })
+                        if (appCenterEnabledChanged)
+                            updateApplication.push({ op: 'replace', path: '/appCenterEnabled', value: true })
+                        if (provisionRequestEnabledChanged)
+                            updateApplication.push({ op: 'replace', path: '/provisionRequestEnabled', value: true })
+                        if (matchAllAccountsChanged)
+                            updateApplication.push({ op: 'replace', path: '/matchAllAccounts', value: false })
+                    } else {
+                        updateApplication = [
+                            { op: 'replace', path: '/accessProfiles', value: accessProfiles },
+                            { op: 'replace', path: '/enabled', value: true },
+                            { op: 'replace', path: '/appCenterEnabled', value: true },
+                            { op: 'replace', path: '/provisionRequestEnabled', value: true },
+                            { op: 'replace', path: '/matchAllAccounts', value: false },
+                        ]
                     }
 
                     try {
@@ -534,34 +546,7 @@ export const connector = async () => {
                     if (id) {
                         logger.debug(`Evaluating existing role for update: ${roleName}`)
                         const existingRole = existingRoleMap.get(roleName)
-                        const roleUpdate: JsonPatchOperationV2025[] = [
-                            {
-                                op: 'replace',
-                                path: '/entitlements',
-                                value: entitlements,
-                            },
-                        ]
-                        if (requestable) {
-                            roleUpdate.push({
-                                op: 'replace',
-                                path: '/requestable',
-                                value: true,
-                            })
-                        }
-                        if (accessRequestConfig) {
-                            roleUpdate.push({
-                                op: 'replace',
-                                path: '/accessRequestConfig',
-                                value: accessRequestConfig,
-                            })
-                        }
-                        if (membership) {
-                            roleUpdate.push({
-                                op: 'replace',
-                                path: '/membership',
-                                value: membership,
-                            })
-                        }
+                        let roleUpdate: JsonPatchOperationV2025[] = []
 
                         if (existingRole) {
                             const entitlementsChanged = !areEntitlementRefsEqual(
@@ -585,6 +570,44 @@ export const connector = async () => {
                                 logger.debug(`No changes detected for role ${roleName}, skipping update`)
                                 return
                             }
+
+                            if (entitlementsChanged)
+                                roleUpdate.push({ op: 'replace', path: '/entitlements', value: entitlements })
+                            if (requestableChanged) {
+                                if (requestable) {
+                                    roleUpdate.push({ op: 'replace', path: '/requestable', value: true })
+                                } else {
+                                    roleUpdate.push({ op: 'replace', path: '/requestable', value: false })
+                                }
+                            }
+                            if (accessRequestConfigChanged) {
+                                if (accessRequestConfig) {
+                                    roleUpdate.push({
+                                        op: 'replace',
+                                        path: '/accessRequestConfig',
+                                        value: accessRequestConfig,
+                                    })
+                                } else {
+                                    roleUpdate.push({ op: 'remove', path: '/accessRequestConfig' })
+                                }
+                            }
+                            if (membershipChanged) {
+                                if (membership) {
+                                    roleUpdate.push({ op: 'replace', path: '/membership', value: membership })
+                                } else {
+                                    roleUpdate.push({ op: 'remove', path: '/membership' })
+                                }
+                            }
+                        } else {
+                            roleUpdate = [{ op: 'replace', path: '/entitlements', value: entitlements }]
+                            if (requestable) roleUpdate.push({ op: 'replace', path: '/requestable', value: true })
+                            if (accessRequestConfig)
+                                roleUpdate.push({
+                                    op: 'replace',
+                                    path: '/accessRequestConfig',
+                                    value: accessRequestConfig,
+                                })
+                            if (membership) roleUpdate.push({ op: 'replace', path: '/membership', value: membership })
                         }
                         try {
                             logger.debug(`Updating existing role: ${roleName}`)
