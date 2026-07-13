@@ -34,8 +34,10 @@
 **Action:** Use Sets or frequency maps instead of array sorting for array equality comparisons.
 
 ## 2026-07-01 - Prevent N+1 API query bottlenecks in Entitlement Fetching
+
 **Learning:** Sequential processing in loops of remote data fetches leads to N+1 API query bottlenecks which impact application performance. In this connector SDK context, fetching entitlements in a sequential manner per access profile definition resulted in poor throughput.
 **Action:** Batched network requests by extracting unique queries into Sets and fetching them concurrently using a concurrency limiter utility (`processConcurrent`) with `Promise.all` before iteration begins.
+
 ## 2026-06-29 - Batching API Lookups with "in" filter
 
 **Learning:** Unbounded sequential API calls within loops or even bounded concurrent single API requests using `name eq "xyz"` can hit rate limits or have a large network overhead when evaluating many items.
@@ -44,3 +46,11 @@
 
 **Learning:** When using chunked `Promise.all` for concurrency (e.g. `processConcurrent`), the entire chunk must complete before the next chunk can start. This causes "head-of-line" blocking where one slow API request delays the processing of all other items in subsequent chunks, reducing network throughput.
 **Action:** Utilize a worker-pool model instead. By spinning up a fixed number of workers that continuously pull from the queue, idle workers can immediately process new items as soon as they finish their current task, ensuring smoother and higher network I/O throughput.
+
+## 2024-07-01 - Worker-pool pattern for batch API requests
+
+**Learning:** Using a chunked `Promise.all` approach for concurrent operations can cause "head-of-line" blocking, where the entire chunk waits for the slowest request to complete before processing the next chunk.
+**Action:** Replace chunked `Promise.all` loops with a worker-pool concurrency model. This allows idle workers to instantly pull and process the next item in the queue, eliminating idle waiting and increasing throughput for network I/O bound operations.
+## $(date +%Y-%m-%d) - Pre-fetch entitlements for role definition queries concurrently
+**Learning:** During role processing, iterating sequentially over role definitions and executing API queries inside the loop (`await isc.listEntitlements(definition.query)`) creates a massive N+1 query bottleneck, exacerbating network latency and slowing down execution.
+**Action:** Always pre-fetch nested dependencies in batches using a concurrency limiter (like `processConcurrent`) before entering inner loops, caching the results in a Map or Set to replace network I/O with O(1) memory lookups.
