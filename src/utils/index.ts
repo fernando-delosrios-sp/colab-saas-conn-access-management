@@ -154,3 +154,28 @@ export const escapeFilterString = (value: string): string => {
 }
 
 export { stringToMembership }
+
+// ⚡ Bolt: Worker-pool model for batch processing to avoid head-of-line blocking
+export async function processConcurrent<T, R>(
+    items: T[],
+    processor: (item: T) => Promise<R>,
+    concurrencyLimit: number = 10
+): Promise<R[]> {
+    const results: R[] = new Array(items.length)
+    let currentIndex = 0
+
+    const worker = async () => {
+        while (currentIndex < items.length) {
+            const index = currentIndex++
+            results[index] = await processor(items[index])
+        }
+    }
+
+    const workers = []
+    for (let i = 0; i < Math.min(concurrencyLimit, items.length); i++) {
+        workers.push(worker())
+    }
+
+    await Promise.all(workers)
+    return results
+}
