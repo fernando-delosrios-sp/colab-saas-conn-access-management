@@ -55,6 +55,21 @@ export const connector = async () => {
         }, PROCESSINGWAIT)
 
         try {
+            // ⚡ Bolt: Consolidate Entitlement Pre-Fetching to avoid redundant API queries
+            // when the same query is used in both access profiles and roles
+            const allQueries = [
+                ...(config.accessProfiles?.map((d) => d.query) || []),
+                ...(config.roles?.map((d) => d.query) || []),
+            ]
+            const uniqueGlobalQueries = Array.from(new Set(allQueries))
+            logger.debug(`Pre-fetching entitlements for ${uniqueGlobalQueries.length} unique global queries`)
+            const globalQueryResults = await processConcurrent(uniqueGlobalQueries, async (query) => {
+                const entitlements = await isc.listEntitlements(query)
+                return { query, entitlements }
+            })
+            const globalQueryToEntitlementsMap = new Map<string, EntitlementV2025[]>()
+            globalQueryResults.forEach((res) => globalQueryToEntitlementsMap.set(res.query, res.entitlements))
+
             // Access profiles
             if (config.accessProfiles) {
                 logger.debug(`Processing ${config.accessProfiles.length} accessProfiles`)
@@ -64,22 +79,13 @@ export const connector = async () => {
                 const existingAppMap = new Map<string, SourceAppV2025>()
                 // ⚡ Bolt: Cache source owners to avoid N+1 API calls for identical source IDs
                 const sourceOwnerMap = new Map<string, string>()
-                // ⚡ Bolt: Pre-fetch entitlements for all definition queries concurrently
-                const uniqueQueries = Array.from(new Set(config.accessProfiles.map((d) => d.query)))
-                logger.debug(`Pre-fetching entitlements for ${uniqueQueries.length} unique queries`)
-                const queryResults = await processConcurrent(uniqueQueries, async (query) => {
-                    const entitlements = await isc.listEntitlements(query)
-                    return { query, entitlements }
-                })
-                const queryToEntitlementsMap = new Map<string, EntitlementV2025[]>()
-                queryResults.forEach((res) => queryToEntitlementsMap.set(res.query, res.entitlements))
 
                 // Process each definition
                 accessProfiles: for (const definition of config.accessProfiles) {
                     // ⚡ Bolt: Scope entitlementMap to definition loop to avoid O(n²) redundant re-processing
                     const entitlementMap = new Map<string, EntitlementV2025[]>()
                     logger.debug(`Processing definition: ${definition.name}`)
-                    const entitlements = queryToEntitlementsMap.get(definition.query) || []
+                    const entitlements = globalQueryToEntitlementsMap.get(definition.query) || []
                     logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
                     // Get entitlements, access profiles, and applications from each entitlement found
                     entitlements: for (let entitlement of entitlements) {
@@ -432,16 +438,6 @@ export const connector = async () => {
 
                 const sourceId = source.id!
 
-                // ⚡ Bolt: Pre-fetch entitlements for all role queries concurrently
-                const uniqueRoleQueries = Array.from(new Set(config.roles.map((d) => d.query)))
-                logger.debug(`Pre-fetching entitlements for ${uniqueRoleQueries.length} unique role queries`)
-                const roleQueryResults = await processConcurrent(uniqueRoleQueries, async (query) => {
-                    const entitlements = await isc.listEntitlements(query)
-                    return { query, entitlements }
-                })
-                const roleQueryToEntitlementsMap = new Map<string, EntitlementV2025[]>()
-                roleQueryResults.forEach((res) => roleQueryToEntitlementsMap.set(res.query, res.entitlements))
-
                 // Process each definition
                 roles: for (const definition of config.roles) {
                     // ⚡ Bolt: Scope entitlementMap to definition loop to avoid O(n²) redundant re-processing
@@ -455,7 +451,7 @@ export const connector = async () => {
                         roleMembership = await stringToMembership(definition.assignmentDefinition, sources)
                     }
 
-                    const entitlements = roleQueryToEntitlementsMap.get(definition.query) || []
+                    const entitlements = globalQueryToEntitlementsMap.get(definition.query) || []
                     logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
                     // Get entitlements, access profiles, and applications from each entitlement found
                     entitlements: for (let entitlement of entitlements) {

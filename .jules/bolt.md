@@ -62,3 +62,6 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+## 2024-05-14 - [Consolidate redundant pre-fetching across distinct configuration blocks]
+**Learning:** In the SailPoint Connector SDK, distinct configuration blocks (like `accessProfiles` and `roles`) often share identical query definitions. Pre-fetching these queries within scoped blocks resulted in redundant, duplicate API calls.
+**Action:** Extract unique queries from across all configuration blocks into a single global array, deduplicate using a `Set`, and fetch all required data concurrently upfront into a shared map before processing the distinct blocks. This eliminates N+1 query duplications entirely across different resource types.
