@@ -37,8 +37,11 @@ function isUnsafeVelocityAST(nodes: any): boolean {
             id === 'prototype' ||
             (nodes.type === 'index' &&
                 id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
+                ((id.type === 'string' &&
+                    (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype')) ||
+                    id.isEval === true ||
+                    id.type === 'references' ||
+                    id.type === 'math'))
         )
             return true
 
@@ -154,3 +157,20 @@ export const escapeFilterString = (value: string): string => {
 }
 
 export { stringToMembership }
+
+export async function processConcurrent<T, R>(items: T[], fn: (item: T) => Promise<R>, concurrency = 5): Promise<R[]> {
+    const results: R[] = new Array(items.length)
+    let currentIndex = 0
+
+    const worker = async () => {
+        while (currentIndex < items.length) {
+            const index = currentIndex++
+            results[index] = await fn(items[index])
+        }
+    }
+
+    const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker())
+    await Promise.all(workers)
+
+    return results
+}
