@@ -37,8 +37,12 @@ function isUnsafeVelocityAST(nodes: any): boolean {
             id === 'prototype' ||
             (nodes.type === 'index' &&
                 id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
+                ((id.type === 'string' &&
+                    (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype')) ||
+                    id.isEval === true ||
+                    (id.type === 'references' &&
+                        (id.id === 'constructor' || id.id === '__proto__' || id.id === 'prototype')))) ||
+            nodes.type === 'set' // Block dynamic variable assignments which bypass static AST checks
         )
             return true
 
@@ -55,6 +59,25 @@ function isUnsafeVelocityAST(nodes: any): boolean {
 // This reduces template rendering time by ~95% in large entitlement loops.
 const templateCache = new Map<string, any>()
 
+function createSafeContext(context: any): any {
+    if (typeof context !== 'object' || context === null) return context
+    return new Proxy(context, {
+        get(target, prop, receiver) {
+            if (prop === 'constructor' || prop === '__proto__' || prop === 'prototype') {
+                throw new Error('Access to unsafe properties is blocked')
+            }
+            const value = Reflect.get(target, prop, receiver)
+            if (typeof value === 'function') {
+                return value.bind(target)
+            }
+            if (typeof value === 'object' && value !== null) {
+                return createSafeContext(value)
+            }
+            return value
+        },
+    })
+}
+
 export const buildName = (entitlement: EntitlementV2025, definition: Definition): string => {
     let velocity = templateCache.get(definition.nameTemplate)
     if (!velocity) {
@@ -66,7 +89,8 @@ export const buildName = (entitlement: EntitlementV2025, definition: Definition)
         templateCache.set(definition.nameTemplate, velocity)
     }
 
-    const name = velocity.render(entitlement.attributes)
+    const safeContext = createSafeContext(entitlement.attributes)
+    const name = velocity.render(safeContext)
 
     return name
 }
