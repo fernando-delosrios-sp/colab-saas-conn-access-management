@@ -31,6 +31,9 @@ function isUnsafeVelocityAST(nodes: any): boolean {
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
+        // Block dynamic assignments (#set) as they can be used to construct malicious payloads
+        if (nodes.type === 'set') return true
+
         if (
             id === 'constructor' ||
             id === '__proto__' ||
@@ -60,7 +63,9 @@ export const buildName = (entitlement: EntitlementV2025, definition: Definition)
     if (!velocity) {
         const template = velocityjs.parse(definition.nameTemplate)
         if (isUnsafeVelocityAST(template)) {
-            throw new Error('Invalid template: access to constructor, __proto__, or prototype is not allowed')
+            throw new Error(
+                'Invalid template: access to constructor, __proto__, prototype, or dynamic assignment is not allowed'
+            )
         }
         velocity = new velocityjs.Compile(template)
         templateCache.set(definition.nameTemplate, velocity)

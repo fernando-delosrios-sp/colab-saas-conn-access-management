@@ -73,3 +73,18 @@ test('buildName should handle conditionals in template', () => {
     const result = buildName(mockEntitlement, mockDefinition)
     assert.strictEqual(result, 'Contractor')
 })
+
+test('buildName should throw error for template containing #set dynamic assignment', () => {
+    const mockEntitlement = {
+        attributes: {},
+    } as any
+
+    const mockDefinition = {
+        nameTemplate: '#set($x = 1)',
+    } as any
+
+    assert.throws(
+        () => buildName(mockEntitlement, mockDefinition),
+        /Invalid template: access to constructor, __proto__, prototype, or dynamic assignment is not allowed/
+    )
+})
