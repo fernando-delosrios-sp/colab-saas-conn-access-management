@@ -1,86 +1,14 @@
 import { EntitlementRefV2025, EntitlementV2025 } from 'sailpoint-api-client'
-import { Definition } from '../model/config'
-import velocityjs from 'velocityjs'
 import { stringToMembership } from './membership-parser'
+import { buildEntitlementVelocityContext, evaluateVelocityExpression } from './velocity'
 
-export const normalizeAttributes = (entitlement: EntitlementV2025, _group: string | undefined): EntitlementV2025 => {
-    const attributes = {
-        ...entitlement.attributes,
-        name: entitlement.name,
-        value: entitlement.value,
-        _source: entitlement.source?.name,
-        _group,
-    }
-
-    return { ...entitlement, attributes }
-}
-
-function isUnsafeVelocityAST(nodes: any): boolean {
-    if (!nodes) return false
-
-    if (Array.isArray(nodes)) {
-        for (const node of nodes) {
-            if (isUnsafeVelocityAST(node)) return true
-        }
-        return false
-    }
-
-    if (typeof nodes === 'object') {
-        const id = nodes.id
-
-        // Block macro evaluation logic
-        if (nodes.type === 'macro_call' && id === 'evaluate') return true
-
-        if (
-            id === 'constructor' ||
-            id === '__proto__' ||
-            id === 'prototype' ||
-            (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
-        )
-            return true
-
-        for (const key of Object.keys(nodes)) {
-            if (isUnsafeVelocityAST(nodes[key])) return true
-        }
-    }
-
-    return false
-}
-
-// ⚡ Bolt: Cache compiled velocity templates to avoid redundant parsing/compilation
-// for the same nameTemplate string across thousands of entitlements.
-// This reduces template rendering time by ~95% in large entitlement loops.
-const templateCache = new Map<string, any>()
-
-export const buildName = (entitlement: EntitlementV2025, definition: Definition): string => {
-    let velocity = templateCache.get(definition.nameTemplate)
-    if (!velocity) {
-        const template = velocityjs.parse(definition.nameTemplate)
-        if (isUnsafeVelocityAST(template)) {
-            throw new Error('Invalid template: access to constructor, __proto__, or prototype is not allowed')
-        }
-        velocity = new velocityjs.Compile(template)
-        templateCache.set(definition.nameTemplate, velocity)
-    }
-
-    const name = velocity.render(entitlement.attributes)
-
-    return name
-}
-
-export const entitlementToRef = (entitlement: EntitlementV2025): EntitlementRefV2025 => {
-    return {
-        id: entitlement.id!,
-        name: entitlement.name!,
-        type: 'ENTITLEMENT',
-    }
-}
+export const entitlementToRef = (entitlement: EntitlementV2025): EntitlementRefV2025 => ({
+    id: entitlement.id!,
+    name: entitlement.name!,
+    type: 'ENTITLEMENT',
+})
 
 // ⚡ Bolt: Use O(n) frequency map logic instead of O(n log n) array sorting
-// to improve performance when comparing string arrays and entitlement references.
 export const areStringArraysEqual = (a?: string[], b?: string[]): boolean => {
     const arrA = a ?? []
     const arrB = b ?? []
@@ -102,38 +30,22 @@ export const areStringArraysEqual = (a?: string[], b?: string[]): boolean => {
     return true
 }
 
-export const areEntitlementRefsEqual = (a?: { id?: string | null }[] | null, b?: { id?: string | null }[]): boolean => {
-    const arrA = a ?? []
-    const arrB = b ?? []
-
-    const counts = new Map<string, number>()
-    let validCountA = 0
-    let validCountB = 0
-
-    for (let i = 0; i < arrA.length; i++) {
-        const id = arrA[i].id
-        if (id) {
-            counts.set(id, (counts.get(id) || 0) + 1)
-            validCountA++
-        }
-    }
-
-    for (let i = 0; i < arrB.length; i++) {
-        const id = arrB[i].id
-        if (id) {
-            const count = counts.get(id)
-            if (!count) return false
-            counts.set(id, count - 1)
-            validCountB++
-        }
-    }
-
-    return validCountA === validCountB
-}
-
-export const areJsonEqual = (a: any, b: any): boolean => {
-    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
-}
+export { areEntitlementRefsEqual, areJsonEqual } from './comparison'
+export { stringToMembership }
+export { evaluateVelocityExpression } from './velocity'
+export { buildEntitlementVelocityContext } from './velocity'
+export {
+    pushToGroupMap,
+    buildApprovalSchemesConfig,
+    buildEntitlementPatch,
+    buildEntitlementRequestConfig,
+    detectRequestableAndConfigChanges,
+    shouldSkipUpdate,
+} from './aggregation'
+export type { EntitlementPatchOptions, ChangeDetectionResult } from './aggregation'
+export { runWithConcurrency } from './concurrency'
+export { searchWithFallback } from './search-fallback'
+export type { SearchFallbackOptions } from './search-fallback'
 
 export const getErrorMessage = (error: unknown): string => {
     if (error instanceof Error) {
@@ -153,11 +65,7 @@ export const escapeFilterString = (value: string): string => {
     return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
-export { stringToMembership }
-
 // ⚡ Bolt: Worker-pool implementation for concurrent processing
-// This eliminates "head-of-line" blocking found in chunked Promise.all approaches.
-// Idle workers instantly process new items, maximizing network I/O throughput.
 export const processConcurrent = async <T, R>(
     items: T[],
     processor: (item: T) => Promise<R>,

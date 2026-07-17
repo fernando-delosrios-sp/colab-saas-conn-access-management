@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert'
-import { buildName } from './index'
+import { evaluateVelocityExpression } from './velocity'
 
 test('buildName should render template with entitlement attributes correctly', () => {
     const mockEntitlement = {
@@ -14,7 +14,7 @@ test('buildName should render template with entitlement attributes correctly', (
         nameTemplate: 'Role: $role - Dept: $department',
     } as any
 
-    const result = buildName(mockEntitlement, mockDefinition)
+    const result = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes)
     assert.strictEqual(result, 'Role: Admin - Dept: Engineering')
 })
 
@@ -37,8 +37,8 @@ test('buildName should use cache for repeated template definitions', () => {
         nameTemplate: 'Role: $role - Dept: $department',
     } as any
 
-    const result1 = buildName(mockEntitlement1, mockDefinition)
-    const result2 = buildName(mockEntitlement2, mockDefinition)
+    const result1 = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement1.attributes)
+    const result2 = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement2.attributes)
 
     assert.strictEqual(result1, 'Role: Admin - Dept: Engineering')
     assert.strictEqual(result2, 'Role: User - Dept: Sales')
@@ -55,7 +55,7 @@ test('buildName should handle missing attributes', () => {
         nameTemplate: 'Role: $role - Dept: $department',
     } as any
 
-    const result = buildName(mockEntitlement, mockDefinition)
+    const result = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes)
     assert.strictEqual(result, 'Role: Admin - Dept: $department')
 })
 
@@ -70,6 +70,6 @@ test('buildName should handle conditionals in template', () => {
         nameTemplate: '#if($type == "contractor")Contractor#else Employee#end',
     } as any
 
-    const result = buildName(mockEntitlement, mockDefinition)
+    const result = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes)
     assert.strictEqual(result, 'Contractor')
 })
