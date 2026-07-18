@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2024-07-25 - Consolidate configuration API queries
+
+**Learning:** When fetching data for `accessProfiles` and `roles`, the codebase was performing identical API queries separately for each configuration block. This led to redundant network requests when both configurations used the same queries to fetch `entitlements`, introducing unnecessary performance overhead.
+**Action:** Consolidate data fetching across distinct configuration blocks into a single deduplicated global set before issuing concurrent pre-fetching calls. This eliminates redundant API calls for shared queries.
