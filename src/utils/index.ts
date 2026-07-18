@@ -31,6 +31,9 @@ function isUnsafeVelocityAST(nodes: any): boolean {
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
+        // Block all dynamic variable assignments to prevent SSTI payload construction
+        if (nodes.type === 'set') return true
+
         if (
             id === 'constructor' ||
             id === '__proto__' ||
