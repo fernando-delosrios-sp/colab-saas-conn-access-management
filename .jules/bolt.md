@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## $(date +%Y-%m-%d) - Consolidate Entitlement Queries Across Configurations
+
+**Learning:** When fetching data for distinct but related configuration blocks (like `accessProfiles` and `roles`), separate pre-fetching stages can result in duplicate API queries if both configurations rely on the same query filter (e.g. `entitlement.query`).
+**Action:** Consolidate unique queries from all relevant configuration loops into a single global `Set` at the very beginning of the processing phase. Execute the batched API pre-fetch once, storing results in a shared Map that can be queried by all subsequent processing stages. This eliminates redundant network calls and maximizes concurrency.
