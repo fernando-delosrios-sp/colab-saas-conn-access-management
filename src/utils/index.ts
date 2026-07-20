@@ -35,10 +35,18 @@ function isUnsafeVelocityAST(nodes: any): boolean {
             id === 'constructor' ||
             id === '__proto__' ||
             id === 'prototype' ||
+            id === 'process' ||
+            id === 'require' ||
+            id === 'global' ||
             (nodes.type === 'index' &&
                 id &&
                 id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
+                (id.value === 'constructor' ||
+                    id.value === '__proto__' ||
+                    id.value === 'prototype' ||
+                    id.value === 'process' ||
+                    id.value === 'require' ||
+                    id.value === 'global'))
         )
             return true
 
