@@ -67,3 +67,8 @@
 
 **Learning:** When fetching data for distinct but related configuration blocks (like `accessProfiles` and `roles`), separate pre-fetching stages can result in duplicate API queries if both configurations rely on the same query filter (e.g. `entitlement.query`).
 **Action:** Consolidate unique queries from all relevant configuration loops into a single global `Set` at the very beginning of the processing phase. Execute the batched API pre-fetch once, storing results in a shared Map that can be queried by all subsequent processing stages. This eliminates redundant network calls and maximizes concurrency.
+
+## 2026-07-20 - Optimize Map Iterations and Hoist Invariants
+
+**Learning:** When iterating over a `Map`'s keys in an outer loop (e.g., `for (const key of map.keys())`) and then repeatedly calling `map.get(key)` inside the loop (or in an inner loop), it creates redundant O(1) lookups that accumulate into a performance bottleneck in large datasets. Furthermore, evaluating loop-invariant expressions (like checking `definition.groupType` to assign an `appName`) inside the innermost loop forces the JS engine to repeatedly execute identical logic unnecessarily.
+**Action:** Always use `map.entries()` (e.g., `for (const [key, values] of map.entries())`) to retrieve both the key and the pre-resolved value simultaneously, avoiding redundant `.get()` calls. Additionally, always hoist loop-invariant assignments outside of the inner loop scope to reduce redundant executions.
