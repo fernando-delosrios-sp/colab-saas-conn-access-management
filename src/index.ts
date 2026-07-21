@@ -148,17 +148,19 @@ export const connector = async () => {
                     // ⚡ Bolt: Pre-fetch sources and apps concurrently to avoid N+1 queries
                     const sourcesToFetch = new Set<string>()
                     const appsToFetch = new Set<string>()
-                    for (const groupName of entitlementMap.keys()) {
-                        for (const entitlement of entitlementMap.get(groupName)!) {
+                    for (const [groupName, groupEntitlements] of entitlementMap.entries()) {
+                        let appName: string | undefined
+                        if (definition.createApplication) {
+                            appName = definition.groupType === 'accessProfile' ? definition.name : groupName
+                            if (!applicationMap.has(appName)) {
+                                appsToFetch.add(appName)
+                            }
+                        }
+
+                        for (const entitlement of groupEntitlements) {
                             const sId = entitlement.source!.id!
                             if (!sourceOwnerMap.has(sId)) {
                                 sourcesToFetch.add(sId)
-                            }
-                            if (definition.createApplication) {
-                                const appName = definition.groupType === 'accessProfile' ? definition.name : groupName
-                                if (!applicationMap.has(appName)) {
-                                    appsToFetch.add(appName)
-                                }
                             }
                         }
                     }

@@ -72,3 +72,7 @@
 
 **Learning:** When iterating over a `Map`'s keys in an outer loop (e.g., `for (const key of map.keys())`) and then repeatedly calling `map.get(key)` inside the loop (or in an inner loop), it creates redundant O(1) lookups that accumulate into a performance bottleneck in large datasets. Furthermore, evaluating loop-invariant expressions (like checking `definition.groupType` to assign an `appName`) inside the innermost loop forces the JS engine to repeatedly execute identical logic unnecessarily.
 **Action:** Always use `map.entries()` (e.g., `for (const [key, values] of map.entries())`) to retrieve both the key and the pre-resolved value simultaneously, avoiding redundant `.get()` calls. Additionally, always hoist loop-invariant assignments outside of the inner loop scope to reduce redundant executions.
+## $(date +%Y-%m-%d) - Optimize Map Iterations and Hoist Invariants in Pre-fetch Loop
+
+**Learning:** When iterating over a `Map`'s keys and looking up the value inside the loop (`map.get(key)`), and repeatedly evaluating loop-invariant logic (like checking `definition.createApplication`) inside an inner iteration loop, it causes redundant execution and map lookups that compound in large datasets.
+**Action:** Always use `map.entries()` to retrieve both key and value simultaneously. Always identify and hoist loop-invariant checks and assignments out of innermost loops.
