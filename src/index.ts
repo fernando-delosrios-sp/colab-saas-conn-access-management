@@ -188,20 +188,20 @@ export const connector = async () => {
                         }
                     })
 
-                    groups: for (const groupName of entitlementMap.keys()) {
+                    groups: for (const [groupName, groupEntitlements] of entitlementMap.entries()) {
                         logger.debug(`Processing group: ${groupName}`)
                         let sourceId: string
                         let ownerId: string | undefined
                         let app: SourceAppV2025 | undefined
+                        const appName = definition.groupType === 'accessProfile' ? definition.name : groupName
 
-                        entitlements: for (const entitlement of entitlementMap.get(groupName)!) {
+                        entitlements: for (const entitlement of groupEntitlements) {
                             logger.debug(`Processing entitlement in group: ${entitlement.name}`)
                             const entitlementRef = entitlementToRef(entitlement)
                             sourceId = entitlement.source!.id!
                             if (!ownerId) {
                                 ownerId = sourceOwnerMap.get(sourceId)
                             }
-                            const appName = definition.groupType === 'accessProfile' ? definition.name : groupName
                             if (definition.createApplication) {
                                 if (!applicationMap.has(appName)) {
                                     logger.debug(`Looking up app: ${appName}`)
@@ -484,14 +484,13 @@ export const connector = async () => {
                             entitlementMap.get(definition.name)?.push(entitlement)
                         }
                     }
-                    groups: for (const groupName of entitlementMap.keys()) {
+                    groups: for (const [groupName, groupEntitlements] of entitlementMap.entries()) {
                         logger.debug(`Processing group: ${groupName}`)
-                        let ownerId: string | undefined
+                        const ownerId = source.owner!.id!
 
-                        entitlements: for (const entitlement of entitlementMap.get(groupName)!) {
+                        entitlements: for (const entitlement of groupEntitlements) {
                             logger.debug(`Processing entitlement in group: ${entitlement.name}`)
                             const entitlementRef = entitlementToRef(entitlement)
-                            ownerId = source.owner!.id!
 
                             const name = buildName(entitlement, definition)
                             logger.debug(`Preparing role: ${name}`)
