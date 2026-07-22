@@ -1,10 +1,5 @@
 import { logger } from '@sailpoint/connector-sdk'
-import {
-    EntitlementV2025,
-    JsonPatchOperationV2025,
-    RequestabilityV2025,
-    SourceAppV2025,
-} from 'sailpoint-api-client'
+import { EntitlementV2025, JsonPatchOperationV2025, RequestabilityV2025, SourceAppV2025 } from 'sailpoint-api-client'
 import { ISCClient } from '../isc-client'
 import { AccessProfileDefinition, Config } from '../model/config'
 import {
@@ -59,10 +54,7 @@ export async function aggregateAccessProfiles(
 /**
  * Create or update access profiles and applications
  */
-async function createOrUpdateAccessProfilesAndApps(
-    isc: ISCClient,
-    definition: AccessProfileDefinition
-): Promise<void> {
+async function createOrUpdateAccessProfilesAndApps(isc: ISCClient, definition: AccessProfileDefinition): Promise<void> {
     // Step 1: Fetch and group entitlements into access profiles
     const accessProfiles = await buildAccessProfilesFromEntitlements(isc, definition)
     if (accessProfiles.length === 0) {
@@ -97,7 +89,7 @@ async function processAccessProfiles(
 
     // Cache sources (to get owner IDs) - fetch in parallel
     const sourceCache = new Map<string, SourceAppV2025>()
-    const uniqueSourceIds = new Set(accessProfiles.map(ap => ap.sourceId))
+    const uniqueSourceIds = new Set(accessProfiles.map((ap) => ap.sourceId))
 
     const sourceResults = await Promise.allSettled(
         Array.from(uniqueSourceIds).map(async (sourceId) => {
@@ -137,7 +129,7 @@ async function processAccessProfiles(
         entityType: 'access profiles',
     })
 
-    const existingApMap = new Map(existingAps.map(ap => [ap.name, ap]))
+    const existingApMap = new Map(existingAps.map((ap) => [ap.name, ap]))
 
     logger.debug(`Found ${existingAps.length} existing access profiles`)
 
@@ -182,7 +174,11 @@ async function processAccessProfiles(
                     try {
                         const updated = await isc.updateAccessProfile(
                             existingAp.id,
-                            buildEntitlementPatch(entitlementRefs, { requestable: definition.requestable, accessRequestConfig })
+                            buildEntitlementPatch(entitlementRefs, {
+                                requestable: definition.requestable,
+                                accessRequestConfig,
+                                changes,
+                            })
                         )
                         apId = updated.id!
                         logger.info(`Updated access profile: ${apData.name}`)
@@ -242,9 +238,9 @@ async function processApplications(
     logger.info(`Processing ${applications.length} applications`)
 
     // Search for existing apps
-    const sourceIds = new Set(accessProfiles.map(ap => ap.sourceId))
+    const sourceIds = new Set(accessProfiles.map((ap) => ap.sourceId))
     const existingApps = await isc.listAppsBySources(Array.from(sourceIds))
-    const existingAppMap = new Map(existingApps.filter(app => app.name).map(app => [app.name!, app]))
+    const existingAppMap = new Map(existingApps.filter((app) => app.name).map((app) => [app.name!, app]))
 
     logger.debug(`Found ${existingApps.length} existing apps`)
 
@@ -263,11 +259,11 @@ async function processApplications(
                 const newApp = await isc.createApp(appData.name, appData.sourceId)
                 appId = newApp.id!
                 logger.info(`Created application: ${appData.name} (${appId})`)
-                
+
                 // Wait for the app to be fully ready before updating
                 // This prevents race conditions where the app isn't immediately available
                 logger.debug(`Waiting 2 seconds for newly created app ${appData.name} to be ready`)
-                await new Promise(resolve => setTimeout(resolve, 2000))
+                await new Promise((resolve) => setTimeout(resolve, 2000))
             } catch (error) {
                 logger.error(`Error creating app ${appData.name}: ${error}`)
                 continue
@@ -313,10 +309,7 @@ async function processApplications(
 /**
  * Delete access profiles and applications
  */
-async function deleteAccessProfilesAndApps(
-    isc: ISCClient,
-    definition: AccessProfileDefinition
-): Promise<void> {
+async function deleteAccessProfilesAndApps(isc: ISCClient, definition: AccessProfileDefinition): Promise<void> {
     logger.info(`Delete mode for definition: ${definition.name}`)
 
     // Step 1: Fetch entitlements and determine what access profiles/apps SHOULD exist
@@ -355,7 +348,9 @@ async function deleteAccessProfilesAndApps(
     // Determine which groups are valid (handle groupEntitlements logic)
     for (const [apName, ents] of entitlementGroups.entries()) {
         if (ents.length > 1 && !definition.groupEntitlements) {
-            logger.debug(`Skipping AP ${apName} in delete mode: has ${ents.length} entitlements but groupEntitlements is false`)
+            logger.debug(
+                `Skipping AP ${apName} in delete mode: has ${ents.length} entitlements but groupEntitlements is false`
+            )
             continue
         }
 
@@ -364,7 +359,9 @@ async function deleteAccessProfilesAndApps(
         if (definition.createApplication) {
             if (definition.groupAccessProfiles) {
                 if (!definition.applicationExpression) {
-                    logger.error(`Definition ${definition.name}: groupAccessProfiles is true but applicationExpression not defined`)
+                    logger.error(
+                        `Definition ${definition.name}: groupAccessProfiles is true but applicationExpression not defined`
+                    )
                     continue
                 }
                 const appContext: Record<string, unknown> = {
@@ -396,15 +393,13 @@ async function deleteAccessProfilesAndApps(
         entityType: 'access profiles',
     })
 
-    const existingApps = sourceIds.size > 0
-        ? await isc.listAppsBySources(Array.from(sourceIds))
-        : []
+    const existingApps = sourceIds.size > 0 ? await isc.listAppsBySources(Array.from(sourceIds)) : []
 
     logger.info(`Existing: ${existingAps.length} access profiles, ${existingApps.length} apps`)
 
     // Determine which access profiles will be deleted
-    const apsToDelete = existingAps.filter(ap => ap.name && expectedApNames.has(ap.name) && ap.id)
-    const apIdsToDelete = new Set(apsToDelete.map(ap => ap.id!))
+    const apsToDelete = existingAps.filter((ap) => ap.name && expectedApNames.has(ap.name) && ap.id)
+    const apIdsToDelete = new Set(apsToDelete.map((ap) => ap.id!))
 
     logger.info(`Will delete ${apsToDelete.length} access profiles`)
     logger.debug(`Access profile IDs to delete: ${Array.from(apIdsToDelete).join(', ')}`)
@@ -414,32 +409,36 @@ async function deleteAccessProfilesAndApps(
 
     type AppWithAccessProfiles = SourceAppV2025 & { accessProfileIds: string[] }
 
-    const appsWithAccessProfiles = await runWithConcurrency(existingApps, API_CONCURRENCY, async (app): Promise<AppWithAccessProfiles | null> => {
-        try {
-            if (!app.id) {
-                logger.warn(`App ${app.name} has no ID, skipping`)
+    const appsWithAccessProfiles = await runWithConcurrency(
+        existingApps,
+        API_CONCURRENCY,
+        async (app): Promise<AppWithAccessProfiles | null> => {
+            try {
+                if (!app.id) {
+                    logger.warn(`App ${app.name} has no ID, skipping`)
+                    return null
+                }
+                logger.debug(`Fetching access profiles for app ${app.name} (${app.id})`)
+                const apIds = await isc.getAppAccessProfiles(app.id)
+                logger.debug(`App ${app.name} has ${apIds.length} access profiles`)
+                return {
+                    ...app,
+                    accessProfileIds: apIds,
+                } as AppWithAccessProfiles
+            } catch (error) {
+                logger.error(`Could not fetch access profiles for app ${app.name}: ${error}`)
                 return null
             }
-            logger.debug(`Fetching access profiles for app ${app.name} (${app.id})`)
-            const apIds = await isc.getAppAccessProfiles(app.id)
-            logger.debug(`App ${app.name} has ${apIds.length} access profiles`)
-            return {
-                ...app,
-                accessProfileIds: apIds
-            } as AppWithAccessProfiles
-        } catch (error) {
-            logger.error(`Could not fetch access profiles for app ${app.name}: ${error}`)
-            return null
         }
-    })
+    )
 
     const validApps = appsWithAccessProfiles.filter((app): app is AppWithAccessProfiles => app !== null)
     logger.info(`Successfully fetched access profile details for ${validApps.length} apps`)
 
     // Step 4: Remove access profiles from applications that reference them
-    const appsToUpdate = validApps.filter(app => {
+    const appsToUpdate = validApps.filter((app) => {
         if (!app.accessProfileIds || app.accessProfileIds.length === 0) return false
-        return app.accessProfileIds.some(apId => apIdsToDelete.has(apId))
+        return app.accessProfileIds.some((apId) => apIdsToDelete.has(apId))
     })
 
     if (appsToUpdate.length > 0) {
@@ -447,9 +446,13 @@ async function deleteAccessProfilesAndApps(
         await runWithConcurrency(appsToUpdate, API_CONCURRENCY, async (app) => {
             try {
                 // Filter out the access profiles we're about to delete
-                const remainingAps = app.accessProfileIds.filter(apId => !apIdsToDelete.has(apId))
+                const remainingAps = app.accessProfileIds.filter((apId) => !apIdsToDelete.has(apId))
 
-                logger.info(`Updating app ${app.name}: removing ${app.accessProfileIds.length - remainingAps.length} access profiles (${remainingAps.length} remaining)`)
+                logger.info(
+                    `Updating app ${app.name}: removing ${
+                        app.accessProfileIds.length - remainingAps.length
+                    } access profiles (${remainingAps.length} remaining)`
+                )
                 await isc.updateSourceAccessProfiles(app.id!, [
                     { op: 'replace', path: '/accessProfiles', value: remainingAps },
                 ])
@@ -462,13 +465,13 @@ async function deleteAccessProfilesAndApps(
     }
 
     // Step 5: Delete applications that were created by this connector
-    const appsToDeleteByName = existingApps.filter(app => {
+    const appsToDeleteByName = existingApps.filter((app) => {
         if (!app.name || !app.id) return false
-        
+
         if (definition.createApplication && expectedAppNames.size > 0) {
             return expectedAppNames.has(app.name)
         }
-        
+
         return app.name === definition.name
     })
 
@@ -544,20 +547,24 @@ async function buildAccessProfilesFromEntitlements(
 
     for (const [apName, ents] of groups.entries()) {
         if (ents.length > 1 && !definition.groupEntitlements) {
-            logger.warn(`Access profile ${apName} has ${ents.length} entitlements but groupEntitlements is false, discarding`)
+            logger.warn(
+                `Access profile ${apName} has ${ents.length} entitlements but groupEntitlements is false, discarding`
+            )
             continue
         }
 
         // Validate all entitlements have the same source
         const firstSourceId = ents[0].source!.id!
-        const mixedSources = ents.some(e => e.source?.id !== firstSourceId)
+        const mixedSources = ents.some((e) => e.source?.id !== firstSourceId)
 
         if (mixedSources) {
-            const sourceIds = Array.from(new Set(ents.map(e => e.source?.id).filter(Boolean)))
+            const sourceIds = Array.from(new Set(ents.map((e) => e.source?.id).filter(Boolean)))
             logger.error(
-                `Access profile ${apName} would combine entitlements from multiple sources [${sourceIds.join(', ')}]. ` +
-                `This is not allowed - access profiles must contain entitlements from a single source only. ` +
-                `Discarding this access profile. Fix by ensuring entitlementExpression doesn't group cross-source entitlements.`
+                `Access profile ${apName} would combine entitlements from multiple sources [${sourceIds.join(
+                    ', '
+                )}]. ` +
+                    `This is not allowed - access profiles must contain entitlements from a single source only. ` +
+                    `Discarding this access profile. Fix by ensuring entitlementExpression doesn't group cross-source entitlements.`
             )
             continue
         }
@@ -571,7 +578,9 @@ async function buildAccessProfilesFromEntitlements(
         })
     }
 
-    logger.info(`Built ${accessProfiles.length} valid access profiles (${groups.size - accessProfiles.length} discarded)`)
+    logger.info(
+        `Built ${accessProfiles.length} valid access profiles (${groups.size - accessProfiles.length} discarded)`
+    )
 
     return accessProfiles
 }
@@ -590,7 +599,9 @@ function groupAccessProfilesIntoApplications(
 
         if (definition.groupAccessProfiles) {
             if (!definition.applicationExpression) {
-                logger.error(`Access profile ${ap.name}: groupAccessProfiles is true but applicationExpression not defined`)
+                logger.error(
+                    `Access profile ${ap.name}: groupAccessProfiles is true but applicationExpression not defined`
+                )
                 continue
             }
 
@@ -624,7 +635,9 @@ function groupAccessProfilesIntoApplications(
             }
             appMap.set(appName, appData)
         } else if (appData.sourceId !== ap.sourceId) {
-            logger.error(`Application ${appName} has access profiles from multiple sources (${appData.sourceId} and ${ap.sourceId}), skipping AP ${ap.name}`)
+            logger.error(
+                `Application ${appName} has access profiles from multiple sources (${appData.sourceId} and ${ap.sourceId}), skipping AP ${ap.name}`
+            )
             continue
         }
 
@@ -637,11 +650,8 @@ function groupAccessProfilesIntoApplications(
 /**
  * Validate that source consistency rules are met for the definition
  */
-function validateSourceConsistency(
-    accessProfiles: AccessProfileData[],
-    definition: AccessProfileDefinition
-): void {
-    const sourceIds = new Set(accessProfiles.map(ap => ap.sourceId))
+function validateSourceConsistency(accessProfiles: AccessProfileData[], definition: AccessProfileDefinition): void {
+    const sourceIds = new Set(accessProfiles.map((ap) => ap.sourceId))
 
     if (sourceIds.size <= 1) {
         return
@@ -654,6 +664,8 @@ function validateSourceConsistency(
         logger.error(error)
         throw new Error(error)
     } else {
-        logger.warn(`Definition ${definition.name} creates access profiles across ${sourceIds.size} sources without creating applications. This is allowed but consider splitting into separate definitions for better organization.`)
+        logger.warn(
+            `Definition ${definition.name} creates access profiles across ${sourceIds.size} sources without creating applications. This is allowed but consider splitting into separate definitions for better organization.`
+        )
     }
 }

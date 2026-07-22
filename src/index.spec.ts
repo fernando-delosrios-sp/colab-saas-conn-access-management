@@ -70,7 +70,7 @@ describe('connector export', () => {
 
         it('should successfully test connection', async () => {
             const mockGetPublicIdentityConfig = jest.fn().mockResolvedValue({})
-            ;(ISCClient as jest.Mock).mockImplementation(() => ({
+            ;(ISCClient as unknown as jest.Mock).mockImplementation(() => ({
                 getPublicIdentityConfig: mockGetPublicIdentityConfig,
             }))
 
@@ -89,7 +89,7 @@ describe('connector export', () => {
         it('should handle test connection failure and throw ConnectorError', async () => {
             const mockError = new Error('Test connection failed')
             const mockGetPublicIdentityConfig = jest.fn().mockRejectedValue(mockError)
-            ;(ISCClient as jest.Mock).mockImplementation(() => ({
+            ;(ISCClient as unknown as jest.Mock).mockImplementation(() => ({
                 getPublicIdentityConfig: mockGetPublicIdentityConfig,
             }))
 
