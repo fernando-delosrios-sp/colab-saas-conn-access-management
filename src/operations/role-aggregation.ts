@@ -73,9 +73,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             const name = evaluateVelocityExpression(definition.entitlementExpression, context)
             // Skip if expression evaluated to empty
             if (!name) {
-                logger.info(
-                    `Skipping entitlement ${entitlement.id}: expression evaluated to empty`
-                )
+                logger.info(`Skipping entitlement ${entitlement.id}: expression evaluated to empty`)
                 continue entitlements
             }
 
@@ -104,15 +102,17 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             // Create/update mode: build full role properties
             const ownerId = source.owner!.id!
             const groupEntitlements = entitlementMap.get(groupName)!
-            
+
             const roleProperties: RoleProperties = {
                 ownerId,
                 entitlements: groupEntitlements.map(entitlementToRef),
                 requestable: definition.requestable,
             }
-            
+
             if (definition.approverType) {
-                roleProperties.accessRequestConfig = buildApprovalSchemesConfig(definition.approverType) as RequestabilityForRoleV2025
+                roleProperties.accessRequestConfig = buildApprovalSchemesConfig(
+                    definition.approverType
+                ) as RequestabilityForRoleV2025
             }
 
             // Evaluate membership assignment definition
@@ -121,7 +121,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
                     name: groupName,
                     definitionName: definition.name,
                 }
-                
+
                 if (definition.groupEntitlements) {
                     // Multiple entitlements grouped: provide all as 'entitlements'
                     assignmentContext.entitlements = groupEntitlements
@@ -129,8 +129,11 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
                     // Single entitlement: provide as 'entitlement'
                     assignmentContext.entitlement = groupEntitlements[0]
                 }
-                
-                const assignmentDefinition = evaluateVelocityExpression(definition.assignmentDefinition, assignmentContext)
+
+                const assignmentDefinition = evaluateVelocityExpression(
+                    definition.assignmentDefinition,
+                    assignmentContext
+                )
                 roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
             }
 
@@ -138,7 +141,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             if (existingRole) {
                 roleProperties.id = existingRole.id
             }
-            
+
             roleMap.set(groupName, roleProperties)
         }
     }
@@ -237,7 +240,9 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
         (role) => role.id && role.name && currentRoleNames.has(role.name)
     )
 
-    logger.debug(`Delete run: found ${existingRoleMap.size} existing roles, ${currentRoleNames.size} expected role names, ${rolesToDelete.length} roles to delete`)
+    logger.debug(
+        `Delete run: found ${existingRoleMap.size} existing roles, ${currentRoleNames.size} expected role names, ${rolesToDelete.length} roles to delete`
+    )
     await runWithConcurrency(rolesToDelete, API_CONCURRENCY, async (role) => {
         try {
             logger.info(`Deleting role: ${role.name}`)

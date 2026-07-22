@@ -10,11 +10,7 @@ import { areEntitlementRefsEqual, areJsonEqual } from './comparison'
  * Adds an entitlement to a group map, creating the group array if it doesn't exist.
  * Used when grouping entitlements by expression result (role name, access profile name, etc.).
  */
-export function pushToGroupMap<K>(
-    map: Map<K, EntitlementV2025[]>,
-    key: K,
-    entitlement: EntitlementV2025
-): void {
+export function pushToGroupMap<K>(map: Map<K, EntitlementV2025[]>, key: K, entitlement: EntitlementV2025): void {
     if (!map.has(key)) {
         map.set(key, [])
     }
@@ -64,7 +60,7 @@ export function buildEntitlementPatch(
             value: true as JsonPatchOperationV2025['value'],
         },
     ]
-    
+
     if (options?.requestable !== undefined) {
         const isRequestable = options.requestable === true || String(options.requestable) === 'true'
         patch.push({ op: 'replace', path: '/requestable', value: isRequestable as JsonPatchOperationV2025['value'] })
@@ -116,10 +112,7 @@ export function detectRequestableAndConfigChanges(
         accessRequestConfigChanged: accessRequestConfig
             ? !areJsonEqual(existing.accessRequestConfig, accessRequestConfig)
             : false,
-        membershipChanged:
-            membership !== undefined
-                ? !areJsonEqual(existing.membership, membership)
-                : false,
+        membershipChanged: membership !== undefined ? !areJsonEqual(existing.membership, membership) : false,
         enabledChanged: existing.enabled !== true,
     }
 }
@@ -128,21 +121,16 @@ export function detectRequestableAndConfigChanges(
  * Returns true if no meaningful changes were detected (skip update).
  */
 export function shouldSkipUpdate(result: ChangeDetectionResult, includeMembership = false): boolean {
-    const {
-        entitlementsChanged,
-        requestableChanged,
-        accessRequestConfigChanged,
-        membershipChanged,
-        enabledChanged,
-    } = result
-    
+    const { entitlementsChanged, requestableChanged, accessRequestConfigChanged, membershipChanged, enabledChanged } =
+        result
+
     if (entitlementsChanged || requestableChanged || accessRequestConfigChanged || enabledChanged) {
         return false
     }
-    
+
     if (includeMembership && membershipChanged) {
         return false
     }
-    
+
     return true
 }
