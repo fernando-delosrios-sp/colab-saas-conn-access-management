@@ -2,11 +2,15 @@ import { EntitlementRefV2025, EntitlementV2025 } from 'sailpoint-api-client'
 import { stringToMembership } from './membership-parser'
 import { buildEntitlementVelocityContext, evaluateVelocityExpression } from './velocity'
 
-export const entitlementToRef = (entitlement: EntitlementV2025): EntitlementRefV2025 => ({
-    id: entitlement.id!,
-    name: entitlement.name!,
-    type: 'ENTITLEMENT',
-})
+export const entitlementToRef = (entitlement: EntitlementV2025): EntitlementRefV2025 => {
+    if (!entitlement.id) {
+        throw new Error(`Entitlement is missing ID: ${JSON.stringify(entitlement)}`)
+    }
+    return {
+        type: 'ENTITLEMENT',
+        id: entitlement.id,
+    }
+}
 
 // ⚡ Bolt: Use O(n) frequency map logic instead of O(n log n) array sorting
 export const areStringArraysEqual = (a?: string[], b?: string[]): boolean => {
@@ -47,7 +51,10 @@ export { runWithConcurrency } from './concurrency'
 export { searchWithFallback } from './search-fallback'
 export type { SearchFallbackOptions } from './search-fallback'
 
-export const getErrorMessage = (error: unknown): string => {
+export const getErrorMessage = (error: any): string => {
+    if (error && error.response && error.response.data) {
+        return `${error.message}: ${JSON.stringify(error.response.data)}`
+    }
     if (error instanceof Error) {
         return error.message
     }

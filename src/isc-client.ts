@@ -321,9 +321,10 @@ export class ISCClient {
         ownerId: string,
         sourceId: string,
         entitlements: EntitlementRefV2025[],
-        requestable: boolean = false,
+        requestable: any = false,
         accessRequestConfig?: RequestabilityV2025
     ): Promise<AccessProfileV2025> {
+        const isRequestable = requestable === true || String(requestable) === 'true'
         const api = new AccessProfilesV2025Api(this.config)
         const requestParameters: AccessProfilesV2025ApiCreateAccessProfileRequest = {
             accessProfileV2025: {
@@ -335,13 +336,17 @@ export class ISCClient {
                 },
                 source: {
                     id: sourceId,
+                    type: 'SOURCE',
                 },
                 enabled: true,
                 entitlements,
-                requestable,
+                requestable: isRequestable,
             },
         }
-        if (accessRequestConfig) requestParameters.accessProfileV2025.accessRequestConfig = accessRequestConfig
+        if (accessRequestConfig && isRequestable) requestParameters.accessProfileV2025.accessRequestConfig = accessRequestConfig
+        
+        console.log(`[ISCClient] createAccessProfile payload: ${JSON.stringify(requestParameters, null, 2)}`)
+        
         const response = await api.createAccessProfile(requestParameters)
         return response.data
     }

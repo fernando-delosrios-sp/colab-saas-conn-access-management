@@ -14,6 +14,7 @@ import {
     detectRequestableAndConfigChanges,
     entitlementToRef,
     evaluateVelocityExpression,
+    getErrorMessage,
     runWithConcurrency,
     searchWithFallback,
     shouldSkipUpdate,
@@ -186,7 +187,7 @@ async function processAccessProfiles(
                         apId = updated.id!
                         logger.info(`Updated access profile: ${apData.name}`)
                     } catch (error) {
-                        logger.error(`Error updating access profile ${apData.name}: ${error}`)
+                        logger.error(`Error updating access profile ${apData.name}: ${getErrorMessage(error)}`)
                     }
                 }
             } else {
@@ -203,7 +204,7 @@ async function processAccessProfiles(
                     apId = created.id!
                     logger.info(`Created access profile: ${apData.name}`)
                 } catch (error) {
-                    logger.error(`Error creating access profile ${apData.name}: ${error}`)
+                    logger.error(`Error creating access profile ${apData.name}: ${getErrorMessage(error)}`)
                 }
             }
 

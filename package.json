@@ -9,15 +9,14 @@
         "dev": "cross-env NODE_OPTIONS=--enable-source-maps spcx run dist/index.js",
         "debug": "spcx run dist/index.js",
         "prettier": "npx prettier --write .",
-        "test": "jest --coverage --passWithNoTests",
+        "test": "tsx --test src/utils/index.test.ts",
         "prepack-zip": "npm ci && npm run build",
-        "pack-zip": "spcx package",
-        "test": "tsx --test src/utils/index.test.ts"
+        "pack-zip": "spcx package"
     },
     "private": true,
     "dependencies": {
-        "@sailpoint/connector-sdk": "1.1.38",
-        "sailpoint-api-client": "1.7.1",
+        "@sailpoint/connector-sdk": "1.2.4",
+        "sailpoint-api-client": "1.8.69",
         "axios-retry": "^4.5.0",
         "form-data": "^4.0.2",
         "velocityjs": "^2.1.5"
@@ -58,6 +57,7 @@
     },
     "allowScripts": {
         "fsevents@2.3.3": true,
-        "esbuild@0.28.1": true
+        "esbuild@0.28.1": true,
+        "unrs-resolver@1.11.1": true
     }
 }

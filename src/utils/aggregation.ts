@@ -65,8 +65,9 @@ export function buildEntitlementPatch(
         },
     ]
     
-    if (options?.requestable) {
-        patch.push({ op: 'replace', path: '/requestable', value: true as JsonPatchOperationV2025['value'] })
+    if (options?.requestable !== undefined) {
+        const isRequestable = options.requestable === true || String(options.requestable) === 'true'
+        patch.push({ op: 'replace', path: '/requestable', value: isRequestable as JsonPatchOperationV2025['value'] })
     }
     if (options?.accessRequestConfig) {
         patch.push({
