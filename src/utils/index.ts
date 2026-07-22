@@ -31,24 +31,40 @@ function isUnsafeVelocityAST(nodes: any): boolean {
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
+        const isBanned = (val: string) => {
+            return (
+                val === 'constructor' ||
+                val === '__proto__' ||
+                val === 'prototype' ||
+                val === 'process' ||
+                val === 'require' ||
+                val === 'global'
+            )
+        }
+
         if (
-            id === 'constructor' ||
-            id === '__proto__' ||
-            id === 'prototype' ||
-            id === 'process' ||
-            id === 'require' ||
-            id === 'global' ||
-            (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' ||
-                    id.value === '__proto__' ||
-                    id.value === 'prototype' ||
-                    id.value === 'process' ||
-                    id.value === 'require' ||
-                    id.value === 'global'))
-        )
+            (typeof id === 'string' && isBanned(id)) ||
+            (nodes.type === 'index' && id && id.type === 'string' && isBanned(id.value))
+        ) {
             return true
+        }
+
+        // To prevent sandbox escapes via dynamic evaluation like $user[$var]
+        // we block any non-literal string or integer index access.
+        if (nodes.type === 'index' && id) {
+            if (id.type !== 'string' && id.type !== 'integer') {
+                return true
+            }
+            if (
+                id.type === 'string' &&
+                id.isEval &&
+                id.value &&
+                typeof id.value === 'string' &&
+                id.value.indexOf('$') !== -1
+            ) {
+                return true
+            }
+        }
 
         for (const key of Object.keys(nodes)) {
             if (isUnsafeVelocityAST(nodes[key])) return true
