@@ -20,12 +20,27 @@ function isUnsafeVelocityAST(nodes: any): boolean {
             id === 'constructor' ||
             id === '__proto__' ||
             id === 'prototype' ||
-            (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
+            id === 'process' ||
+            id === 'require' ||
+            id === 'global'
         )
             return true
+
+        if (nodes.type === 'index' && id) {
+            // Block non-literal/dynamic index lookups which can bypass checks
+            if (id.type !== 'string' && id.type !== 'integer') return true
+
+            if (
+                id.type === 'string' &&
+                (id.value === 'constructor' ||
+                    id.value === '__proto__' ||
+                    id.value === 'prototype' ||
+                    id.value === 'process' ||
+                    id.value === 'require' ||
+                    id.value === 'global')
+            )
+                return true
+        }
 
         for (const key of Object.keys(nodes)) {
             if (isUnsafeVelocityAST(nodes[key])) return true
@@ -46,10 +61,7 @@ const templateCache = new Map<string, any>()
  * @returns Rendered string
  * @throws Error if template parsing or rendering fails
  */
-export function evaluateVelocityExpression(
-    template: string,
-    context: Record<string, unknown> = {}
-): string {
+export function evaluateVelocityExpression(template: string, context: Record<string, unknown> = {}): string {
     let velocity = templateCache.get(template)
     if (!velocity) {
         const velocityTemplate = velocityjs.parse(template)
