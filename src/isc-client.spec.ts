@@ -281,7 +281,7 @@ describe('ISCClient', () => {
                     accessProfileV2025: expect.objectContaining({
                         name: 'AP Name',
                         owner: { id: 'owner-1', type: 'IDENTITY' },
-                        source: { id: 'source-1' },
+                        source: { id: 'source-1', type: 'SOURCE' },
                         entitlements,
                     }),
                 })
@@ -311,7 +311,7 @@ describe('ISCClient', () => {
                     accessProfileV2025: expect.objectContaining({
                         name: 'AP Name',
                         owner: { id: 'owner-1', type: 'IDENTITY' },
-                        source: { id: 'source-1' },
+                        source: { id: 'source-1', type: 'SOURCE' },
                         entitlements,
                         requestable: true,
                         accessRequestConfig,
