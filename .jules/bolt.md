@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2024-07-20 - Cache and Memoize Global Search API Responses
+
+**Learning:** When evaluating role, access profile, and entitlement definitions in a sequential loop (e.g. `for (const definition of config.roles) { const entitlements = await isc.listEntitlements(definition.query) ... }`), identical queries repeated across iterations cause redundant and extremely slow network requests. Unbounded sequential API calls create a significant N+1 bottleneck during evaluation.
+**Action:** Implemented a query cache in `ISCClient.listEntitlements` (`Map<string, EntitlementV2025[]>`) to memoize search responses by their query string. This ensures that any identical queries executed during the connector run instantly return from memory (O(1)) instead of hitting the network, eliminating N+1 API latency across the loop lifecycle.
