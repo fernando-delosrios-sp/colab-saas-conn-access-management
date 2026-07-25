@@ -102,7 +102,7 @@ async function processAccessProfiles(
         if (result.status === 'fulfilled') {
             sourceCache.set(result.value.sourceId, result.value.source)
         } else {
-            logger.error(`Error fetching source: ${result.reason}`)
+            logger.error(`Error fetching source: ${getErrorMessage(result.reason)}`)
         }
     }
 
@@ -265,7 +265,7 @@ async function processApplications(
                 logger.debug(`Waiting 2 seconds for newly created app ${appData.name} to be ready`)
                 await new Promise((resolve) => setTimeout(resolve, 2000))
             } catch (error) {
-                logger.error(`Error creating app ${appData.name}: ${error}`)
+                logger.error(`Error creating app ${appData.name}: ${getErrorMessage(error)}`)
                 continue
             }
         }
@@ -301,7 +301,7 @@ async function processApplications(
             await isc.updateSourceAccessProfiles(appId, appUpdate)
             logger.info(`Updated application: ${appData.name}`)
         } catch (error) {
-            logger.error(`Error updating app ${appData.name}: ${error}`)
+            logger.error(`Error updating app ${appData.name}: ${getErrorMessage(error)}`)
         }
     }
 }
@@ -426,7 +426,7 @@ async function deleteAccessProfilesAndApps(isc: ISCClient, definition: AccessPro
                     accessProfileIds: apIds,
                 } as AppWithAccessProfiles
             } catch (error) {
-                logger.error(`Could not fetch access profiles for app ${app.name}: ${error}`)
+                logger.error(`Could not fetch access profiles for app ${app.name}: ${getErrorMessage(error)}`)
                 return null
             }
         }
@@ -457,7 +457,7 @@ async function deleteAccessProfilesAndApps(isc: ISCClient, definition: AccessPro
                     { op: 'replace', path: '/accessProfiles', value: remainingAps },
                 ])
             } catch (error) {
-                logger.error(`Error updating app ${app.name}: ${error}`)
+                logger.error(`Error updating app ${app.name}: ${getErrorMessage(error)}`)
             }
         })
     } else {
@@ -483,7 +483,7 @@ async function deleteAccessProfilesAndApps(isc: ISCClient, definition: AccessPro
                 logger.info(`Deleting application: ${app.name}`)
                 await isc.deleteSourceApp(app.id!)
             } catch (error) {
-                logger.error(`Error deleting app ${app.name}: ${error}`)
+                logger.error(`Error deleting app ${app.name}: ${getErrorMessage(error)}`)
             }
         })
     }
@@ -497,7 +497,7 @@ async function deleteAccessProfilesAndApps(isc: ISCClient, definition: AccessPro
                 logger.info(`Deleting access profile: ${ap.name}`)
                 await isc.deleteAccessProfile(ap.id!)
             } catch (error) {
-                logger.error(`Error deleting access profile ${ap.name}: ${error}`)
+                logger.error(`Error deleting access profile ${ap.name}: ${getErrorMessage(error)}`)
             }
         })
     }
