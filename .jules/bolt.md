@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## $(date +%Y-%m-%d) - Pre-fetch entitlement queries, batch cache membership, and optimize map loops
+
+**Learning:** During role processing, repeatedly fetching the same entitlement queries via `await isc.listEntitlements(definition.query)` for multiple configurations sharing the same query leads to significant N+1 API blockages and unnecessary network operations. Also, performing redundant Map lookup with `Map.get(key)` inside a `Map.keys()` iteration creates unnecessary O(1) performance overhead and executing `stringToMembership` multiple times for the exact same `assignmentDefinition` results in duplicated expensive AST parsing.
+**Action:** When performing nested evaluations inside loop blocks, apply batch deduplication techniques: (1) Pre-fetch network data by iterating to gather unique dependencies, then executing them concurrently and storing the result in memory Maps (e.g. `queryCache`). (2) Use memory caching (e.g., `membershipCache`) to store parsed results of expensive AST conversions (like `stringToMembership`) mapped to the source string. (3) Standardize on `Map.entries()` for iterations to eliminate duplicate `get()` queries.

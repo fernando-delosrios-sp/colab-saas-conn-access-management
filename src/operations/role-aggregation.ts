@@ -3,6 +3,7 @@ import { EntitlementV2025, RequestabilityForRoleV2025 } from 'sailpoint-api-clie
 import { ISCClient, LightweightRole } from '../isc-client'
 import { Config } from '../model/config'
 import { RoleProperties } from '../model/propertyDefinitions'
+import { RoleMembershipSelectorV2025 } from 'sailpoint-api-client'
 import {
     buildEntitlementVelocityContext,
     buildApprovalSchemesConfig,
@@ -51,17 +52,32 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
         (d) => d.deleteStaleRoles === true || String(d.deleteStaleRoles) === 'true'
     )
 
+    // Pre-fetch all entitlement queries concurrently
+    const uniqueQueries = new Set<string>()
+    for (const definition of config.roles!) {
+        uniqueQueries.add(definition.query)
+    }
+
+    const queryCache = new Map<string, EntitlementV2025[]>()
+    await runWithConcurrency(Array.from(uniqueQueries), API_CONCURRENCY, async (query) => {
+        logger.debug(`Pre-fetching entitlements for query: ${query}`)
+        const ents = await isc.listEntitlements(query)
+        queryCache.set(query, ents)
+        // Collect entitlement IDs
+        for (const ent of ents) {
+            if (ent.id) allEntitlementIds.add(ent.id)
+        }
+    })
+
+    const membershipCache = new Map<string, RoleMembershipSelectorV2025>()
+
     // Phase 1: Collect entitlements and group them per definition
     roles: for (const definition of config.roles!) {
         logger.debug(`Processing definition: ${definition.name}`)
         entitlementMap.clear()
-        const entitlements = await isc.listEntitlements(definition.query)
-        logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
 
-        // Collect entitlement IDs (for a single search later)
-        for (const ent of entitlements) {
-            if (ent.id) allEntitlementIds.add(ent.id)
-        }
+        const entitlements = queryCache.get(definition.query) || []
+        logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
 
         // Evaluate entitlementExpression; group by role name (definition name or expression result)
         entitlements: for (const entitlement of entitlements) {
@@ -89,7 +105,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
         // Phase 2: For each group in this definition, build role properties
         // In delete mode, we still need to track expected role names, but skip expensive property building
-        groups: for (const groupName of entitlementMap.keys()) {
+        groups: for (const [groupName, groupEntitlements] of entitlementMap.entries()) {
             logger.debug(`Processing group: ${groupName}`)
 
             // In delete mode, just track the name to know which roles to delete
@@ -101,8 +117,6 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
             // Create/update mode: build full role properties
             const ownerId = source.owner!.id!
-            const groupEntitlements = entitlementMap.get(groupName)!
-
             const roleProperties: RoleProperties = {
                 ownerId,
                 entitlements: groupEntitlements.map(entitlementToRef),
@@ -134,7 +148,13 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
                     definition.assignmentDefinition,
                     assignmentContext
                 )
-                roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
+
+                let membership = membershipCache.get(assignmentDefinition)
+                if (!membership) {
+                    membership = await stringToMembership(assignmentDefinition, sources)
+                    membershipCache.set(assignmentDefinition, membership)
+                }
+                roleProperties.membership = membership
             }
 
             const existingRole = existingRoleMap.get(groupName)
