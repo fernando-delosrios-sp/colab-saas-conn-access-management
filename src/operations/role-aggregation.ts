@@ -89,7 +89,9 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
         // Phase 2: For each group in this definition, build role properties
         // In delete mode, we still need to track expected role names, but skip expensive property building
-        groups: for (const groupName of entitlementMap.keys()) {
+
+        // ⚡ Bolt: Use O(n) .entries() instead of O(n) .keys() + O(1) .get() inside the loop
+        groups: for (const [groupName, groupEntitlements] of entitlementMap.entries()) {
             logger.debug(`Processing group: ${groupName}`)
 
             // In delete mode, just track the name to know which roles to delete
@@ -101,7 +103,6 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
             // Create/update mode: build full role properties
             const ownerId = source.owner!.id!
-            const groupEntitlements = entitlementMap.get(groupName)!
 
             const roleProperties: RoleProperties = {
                 ownerId,

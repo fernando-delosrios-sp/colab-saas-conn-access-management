@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2024-07-28 - Optimize map iterations and hoist invariant assignments
+
+**Learning:** Iterating over maps using `Map.keys()` followed by a `Map.get(key)` inside the loop creates an unnecessary O(1) lookup on every iteration, and calculating or assigning variables inside loops that don't depend on the loop's context adds to the overhead.
+**Action:** Always iterate using `Map.entries()` to extract the key and value simultaneously, and hoist loop-invariant condition checks and assignments outside of inner loops to improve performance.
