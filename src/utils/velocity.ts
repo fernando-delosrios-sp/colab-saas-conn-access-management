@@ -16,14 +16,13 @@ function isUnsafeVelocityAST(nodes: any): boolean {
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
+        const bannedProperties = ['constructor', '__proto__', 'prototype', 'process', 'require', 'global']
+
         if (
-            id === 'constructor' ||
-            id === '__proto__' ||
-            id === 'prototype' ||
+            bannedProperties.includes(id) ||
             (nodes.type === 'index' &&
                 id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
+                ((id.type !== 'string' && id.type !== 'integer') || bannedProperties.includes(id.value)))
         )
             return true
 
@@ -46,10 +45,7 @@ const templateCache = new Map<string, any>()
  * @returns Rendered string
  * @throws Error if template parsing or rendering fails
  */
-export function evaluateVelocityExpression(
-    template: string,
-    context: Record<string, unknown> = {}
-): string {
+export function evaluateVelocityExpression(template: string, context: Record<string, unknown> = {}): string {
     let velocity = templateCache.get(template)
     if (!velocity) {
         const velocityTemplate = velocityjs.parse(template)
