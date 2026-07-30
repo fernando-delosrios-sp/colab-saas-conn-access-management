@@ -1,5 +1,18 @@
 import velocityjs from 'velocityjs'
 
+const BANNED_PROPERTIES = ['constructor', '__proto__', 'prototype', 'process', 'require', 'global']
+
+function evaluateStaticString(node: any): string | null {
+    if (!node) return null
+    if (node.type === 'string') return node.value
+    if (node.type === 'math' && node.operator === '+') {
+        const left = evaluateStaticString(node.expression[0])
+        const right = evaluateStaticString(node.expression[1])
+        if (left !== null && right !== null) return left + right
+    }
+    return null
+}
+
 function isUnsafeVelocityAST(nodes: any): boolean {
     if (!nodes) return false
 
@@ -16,16 +29,11 @@ function isUnsafeVelocityAST(nodes: any): boolean {
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
-        if (
-            id === 'constructor' ||
-            id === '__proto__' ||
-            id === 'prototype' ||
-            (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
-        )
-            return true
+        if (typeof id === 'string' && BANNED_PROPERTIES.includes(id)) return true
+
+        // 🛡️ Sentinel: Mitigate SSTI via static analysis of AST concatenation
+        const staticVal = evaluateStaticString(nodes)
+        if (staticVal !== null && BANNED_PROPERTIES.includes(staticVal)) return true
 
         for (const key of Object.keys(nodes)) {
             if (isUnsafeVelocityAST(nodes[key])) return true
@@ -46,10 +54,7 @@ const templateCache = new Map<string, any>()
  * @returns Rendered string
  * @throws Error if template parsing or rendering fails
  */
-export function evaluateVelocityExpression(
-    template: string,
-    context: Record<string, unknown> = {}
-): string {
+export function evaluateVelocityExpression(template: string, context: Record<string, unknown> = {}): string {
     let velocity = templateCache.get(template)
     if (!velocity) {
         const velocityTemplate = velocityjs.parse(template)
