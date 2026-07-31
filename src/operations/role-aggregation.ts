@@ -89,7 +89,22 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
         // Phase 2: For each group in this definition, build role properties
         // In delete mode, we still need to track expected role names, but skip expensive property building
-        groups: for (const groupName of entitlementMap.keys()) {
+
+        // ⚡ Bolt: Hoist loop-invariant assignments outside of the inner loop
+        let ownerId: string | undefined
+        let baseAccessRequestConfig: RequestabilityForRoleV2025 | undefined
+
+        if (!deleteStaleRoles) {
+            ownerId = source.owner!.id!
+            if (definition.approverType) {
+                baseAccessRequestConfig = buildApprovalSchemesConfig(
+                    definition.approverType
+                ) as RequestabilityForRoleV2025
+            }
+        }
+
+        // ⚡ Bolt: Use Map.entries() instead of Map.keys() to avoid redundant lookups
+        groups: for (const [groupName, groupEntitlements] of entitlementMap.entries()) {
             logger.debug(`Processing group: ${groupName}`)
 
             // In delete mode, just track the name to know which roles to delete
@@ -100,19 +115,14 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             }
 
             // Create/update mode: build full role properties
-            const ownerId = source.owner!.id!
-            const groupEntitlements = entitlementMap.get(groupName)!
-
             const roleProperties: RoleProperties = {
-                ownerId,
+                ownerId: ownerId!,
                 entitlements: groupEntitlements.map(entitlementToRef),
                 requestable: definition.requestable,
             }
 
-            if (definition.approverType) {
-                roleProperties.accessRequestConfig = buildApprovalSchemesConfig(
-                    definition.approverType
-                ) as RequestabilityForRoleV2025
+            if (baseAccessRequestConfig) {
+                roleProperties.accessRequestConfig = baseAccessRequestConfig
             }
 
             // Evaluate membership assignment definition
