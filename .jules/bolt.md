@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## $(date +%Y-%m-%d) - Prevent duplicate complex object parsing by hoisting and cloning
+
+**Learning:** When resolving static string identifiers (like `assignmentDefinition` into complex membership AST objects) inside sequential item loops (like aggregating `roleProperties`), executing the parser repeatedly causes severe performance degradation, especially if it relies on I/O. However, simply hoisting the parsed object and assigning it by reference to all iterations creates a critical shared object reference bug where modifying one item's config mutates them all.
+**Action:** Always hoist invariant complex parsing logic out of loops to save on processing overhead, but ensure that the hoisted object is deep cloned (e.g., via `JSON.parse(JSON.stringify())` or `structuredClone`) when assigned to the individual properties inside the loop to avoid shared reference regressions.
