@@ -38,25 +38,30 @@ interface ApplicationData {
 export async function aggregateAccessProfiles(
     config: Config,
     isc: ISCClient,
-    definition: AccessProfileDefinition
+    definition: AccessProfileDefinition,
+    fetchEntitlements: (query: string) => Promise<EntitlementV2025[]>
 ): Promise<void> {
     logger.info(`Processing access profile definition: ${definition.name}`)
 
     const deleteMode = definition.deleteMode === true || String(definition.deleteMode) === 'true'
 
     if (deleteMode) {
-        await deleteAccessProfilesAndApps(isc, definition)
+        await deleteAccessProfilesAndApps(isc, definition, fetchEntitlements)
     } else {
-        await createOrUpdateAccessProfilesAndApps(isc, definition)
+        await createOrUpdateAccessProfilesAndApps(isc, definition, fetchEntitlements)
     }
 }
 
 /**
  * Create or update access profiles and applications
  */
-async function createOrUpdateAccessProfilesAndApps(isc: ISCClient, definition: AccessProfileDefinition): Promise<void> {
+async function createOrUpdateAccessProfilesAndApps(
+    isc: ISCClient,
+    definition: AccessProfileDefinition,
+    fetchEntitlements: (query: string) => Promise<EntitlementV2025[]>
+): Promise<void> {
     // Step 1: Fetch and group entitlements into access profiles
-    const accessProfiles = await buildAccessProfilesFromEntitlements(isc, definition)
+    const accessProfiles = await buildAccessProfilesFromEntitlements(isc, definition, fetchEntitlements)
     if (accessProfiles.length === 0) {
         logger.info(`No access profiles to process for definition ${definition.name}`)
         return
@@ -309,7 +314,11 @@ async function processApplications(
 /**
  * Delete access profiles and applications
  */
-async function deleteAccessProfilesAndApps(isc: ISCClient, definition: AccessProfileDefinition): Promise<void> {
+async function deleteAccessProfilesAndApps(
+    isc: ISCClient,
+    definition: AccessProfileDefinition,
+    fetchEntitlements: (query: string) => Promise<EntitlementV2025[]>
+): Promise<void> {
     logger.info(`Delete mode for definition: ${definition.name}`)
 
     // Step 1: Fetch entitlements and determine what access profiles/apps SHOULD exist
@@ -318,7 +327,7 @@ async function deleteAccessProfilesAndApps(isc: ISCClient, definition: AccessPro
     const sourceIds = new Set<string>()
     const entitlementIds = new Set<string>()
 
-    const entitlements = await isc.listEntitlements(definition.query)
+    const entitlements = await fetchEntitlements(definition.query)
     logger.info(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
 
     // Collect source IDs and entitlement IDs
@@ -508,9 +517,10 @@ async function deleteAccessProfilesAndApps(isc: ISCClient, definition: AccessPro
  */
 async function buildAccessProfilesFromEntitlements(
     isc: ISCClient,
-    definition: AccessProfileDefinition
+    definition: AccessProfileDefinition,
+    fetchEntitlements: (query: string) => Promise<EntitlementV2025[]>
 ): Promise<AccessProfileData[]> {
-    const entitlements = await isc.listEntitlements(definition.query)
+    const entitlements = await fetchEntitlements(definition.query)
     logger.info(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
 
     if (entitlements.length === 0) {

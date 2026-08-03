@@ -30,7 +30,11 @@ const API_CONCURRENCY = 8
  * 4. Create or update roles in ISC.
  * 5. Optionally delete stale roles (when deleteStaleRoles is enabled).
  */
-export async function aggregateRoles(config: Config, isc: ISCClient): Promise<void> {
+export async function aggregateRoles(
+    config: Config,
+    isc: ISCClient,
+    fetchEntitlements: (query: string) => Promise<EntitlementV2025[]>
+): Promise<void> {
     const roleMap = new Map<string, RoleProperties>()
     const entitlementMap = new Map<string, EntitlementV2025[]>()
     const existingRoleMap = new Map<string, LightweightRole>()
@@ -55,7 +59,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
     roles: for (const definition of config.roles!) {
         logger.debug(`Processing definition: ${definition.name}`)
         entitlementMap.clear()
-        const entitlements = await isc.listEntitlements(definition.query)
+        const entitlements = await fetchEntitlements(definition.query)
         logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
 
         // Collect entitlement IDs (for a single search later)
