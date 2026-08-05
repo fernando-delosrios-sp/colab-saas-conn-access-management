@@ -35,6 +35,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
     const entitlementMap = new Map<string, EntitlementV2025[]>()
     const existingRoleMap = new Map<string, LightweightRole>()
     const allEntitlementIds = new Set<string>()
+    const membershipCache = new Map<string, any>()
 
     // Find the connector's source (needed for ownerId)
     const sources = await isc.listSources()
@@ -89,7 +90,20 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
         // Phase 2: For each group in this definition, build role properties
         // In delete mode, we still need to track expected role names, but skip expensive property building
-        groups: for (const groupName of entitlementMap.keys()) {
+
+        let ownerId: string | undefined
+        let hoistedAccessRequestConfig: RequestabilityForRoleV2025 | undefined
+
+        if (!deleteStaleRoles) {
+            ownerId = source.owner!.id!
+            if (definition.approverType) {
+                hoistedAccessRequestConfig = buildApprovalSchemesConfig(
+                    definition.approverType
+                ) as RequestabilityForRoleV2025
+            }
+        }
+
+        groups: for (const [groupName, groupEntitlements] of entitlementMap.entries()) {
             logger.debug(`Processing group: ${groupName}`)
 
             // In delete mode, just track the name to know which roles to delete
@@ -100,19 +114,14 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             }
 
             // Create/update mode: build full role properties
-            const ownerId = source.owner!.id!
-            const groupEntitlements = entitlementMap.get(groupName)!
-
             const roleProperties: RoleProperties = {
-                ownerId,
+                ownerId: ownerId!,
                 entitlements: groupEntitlements.map(entitlementToRef),
                 requestable: definition.requestable,
             }
 
-            if (definition.approverType) {
-                roleProperties.accessRequestConfig = buildApprovalSchemesConfig(
-                    definition.approverType
-                ) as RequestabilityForRoleV2025
+            if (hoistedAccessRequestConfig) {
+                roleProperties.accessRequestConfig = hoistedAccessRequestConfig
             }
 
             // Evaluate membership assignment definition
@@ -134,7 +143,14 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
                     definition.assignmentDefinition,
                     assignmentContext
                 )
-                roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
+
+                let cachedMembership = membershipCache.get(assignmentDefinition)
+                if (!cachedMembership) {
+                    cachedMembership = await stringToMembership(assignmentDefinition, sources)
+                    membershipCache.set(assignmentDefinition, cachedMembership)
+                }
+
+                roleProperties.membership = JSON.parse(JSON.stringify(cachedMembership))
             }
 
             const existingRole = existingRoleMap.get(groupName)
