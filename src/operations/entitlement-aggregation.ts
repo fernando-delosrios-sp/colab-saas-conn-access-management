@@ -47,9 +47,24 @@ export async function aggregateEntitlements(config: Config, isc: ISCClient): Pro
         return
     }
 
+    // ⚡ Bolt: Pre-fetch entitlements concurrently to avoid N+1 queries during entitlement definition iteration
+    const uniqueQueries = Array.from(new Set(config.entitlements.map((d) => d.query)))
+    logger.debug(`Pre-fetching entitlements for ${uniqueQueries.length} unique queries`)
+
+    const queryEntitlementMap = new Map<string, EntitlementV2025[]>()
+    await runWithConcurrency(uniqueQueries, API_CONCURRENCY, async (query) => {
+        try {
+            const entitlements = await isc.listEntitlements(query)
+            queryEntitlementMap.set(query, entitlements)
+        } catch (error) {
+            logger.error(`Error pre-fetching entitlements for query "${query}": ${error}`)
+            queryEntitlementMap.set(query, []) // Set empty array to prevent crashing later
+        }
+    })
+
     for (const definition of config.entitlements) {
         logger.debug(`Processing entitlement definition: ${definition.name}`)
-        const entitlements = await isc.listEntitlements(definition.query)
+        const entitlements = queryEntitlementMap.get(definition.query) || []
         logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
 
         // Filter: keep only entitlements where entitlementExpression evaluates to non-empty
@@ -60,9 +75,7 @@ export async function aggregateEntitlements(config: Config, isc: ISCClient): Pro
             })
             const name = evaluateVelocityExpression(definition.entitlementExpression, context)
             if (!name) {
-                logger.info(
-                    `Skipping entitlement ${entitlement.id}: expression evaluated to empty`
-                )
+                logger.info(`Skipping entitlement ${entitlement.id}: expression evaluated to empty`)
                 continue
             }
             selected.push(entitlement)
@@ -104,12 +117,12 @@ export async function aggregateEntitlements(config: Config, isc: ISCClient): Pro
             const chunks = chunk(entitlementIds, BULK_UPDATE_CHUNK_SIZE)
             for (let i = 0; i < chunks.length; i++) {
                 try {
-                    logger.debug(
-                        `Bulk updating ${chunks[i].length} entitlements (chunk ${i + 1}/${chunks.length})`
-                    )
+                    logger.debug(`Bulk updating ${chunks[i].length} entitlements (chunk ${i + 1}/${chunks.length})`)
                     await isc.updateEntitlementsInBulk(chunks[i], jsonPatch)
                 } catch (error) {
-                    logger.error(`Error bulk updating entitlements chunk ${i + 1}/${chunks.length} for definition ${definition.name}: ${error}`)
+                    logger.error(
+                        `Error bulk updating entitlements chunk ${i + 1}/${chunks.length} for definition ${definition.name}: ${error}`
+                    )
                     // Continue with remaining chunks instead of breaking
                 }
             }
