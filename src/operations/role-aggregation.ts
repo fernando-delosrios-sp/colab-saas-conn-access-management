@@ -15,6 +15,7 @@ import {
     searchWithFallback,
     shouldSkipUpdate,
     stringToMembership,
+    getErrorMessage,
 } from '../utils'
 
 // Limit concurrent API calls to avoid overwhelming the API
@@ -181,7 +182,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
                     const rolePayload = await isc.updateRole(id, roleUpdate)
                     role.id = rolePayload.id!
                 } catch (error) {
-                    logger.error(`Error updating role: ${error}`)
+                    logger.error(`Error updating role: ${getErrorMessage(error)}`)
                 }
             } else {
                 logger.debug(`Creating new role: ${roleName}`)
@@ -196,7 +197,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
                     )
                     role.id = rolePayload.id!
                 } catch (error) {
-                    logger.error(`Error creating role: ${error}`)
+                    logger.error(`Error creating role: ${getErrorMessage(error)}`)
                 }
             }
         })
@@ -249,7 +250,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             logger.info(`Deleting role: ${role.name}`)
             await isc.deleteRole(role.id!)
         } catch (error) {
-            logger.error(`Error deleting role ${role.name}: ${error}`)
+            logger.error(`Error deleting role ${role.name}: ${getErrorMessage(error)}`)
         }
     })
 }
