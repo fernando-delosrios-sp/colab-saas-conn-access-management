@@ -41,7 +41,8 @@ import axiosRetry from 'axios-retry'
 import { TOKEN_URL_PATH } from './data/constants'
 import { Config } from './model/config'
 import { retriesConfig } from './axios'
-import { escapeFilterString, processConcurrent } from './utils/index'
+import { escapeFilterString } from './utils/index'
+import { runWithConcurrency } from './utils'
 import { throttle } from './utils/throttle'
 
 // Lightweight types for search results - only keep essential fields to reduce memory
@@ -184,7 +185,7 @@ export class ISCClient {
             chunks.push(names.slice(i, i + chunkSize))
         }
 
-        const results = await processConcurrent(chunks, async (chunk) => {
+        const results = await runWithConcurrency(chunks, 10, async (chunk) => {
             const escapedNames = chunk.map((name) => `"${escapeFilterString(name)}"`).join(', ')
             const filters = `name in (${escapedNames})`
             const requestParameters: AccessProfilesV2025ApiListAccessProfilesRequest = {
@@ -216,7 +217,7 @@ export class ISCClient {
             chunks.push(names.slice(i, i + chunkSize))
         }
 
-        const results = await processConcurrent(chunks, async (chunk) => {
+        const results = await runWithConcurrency(chunks, 10, async (chunk) => {
             const escapedNames = chunk.map((name) => `"${escapeFilterString(name)}"`).join(', ')
             const filters = `name in (${escapedNames})`
             const requestParameters: RolesV2025ApiListRolesRequest = {
@@ -238,7 +239,7 @@ export class ISCClient {
             chunks.push(names.slice(i, i + chunkSize))
         }
 
-        const results = await processConcurrent(chunks, async (chunk) => {
+        const results = await runWithConcurrency(chunks, 10, async (chunk) => {
             const escapedNames = chunk.map((name) => `"${escapeFilterString(name)}"`).join(', ')
             const filters = `name in (${escapedNames})`
             const requestParameters: AppsV2025ApiListAllSourceAppRequest = {
@@ -343,10 +344,11 @@ export class ISCClient {
                 requestable: isRequestable,
             },
         }
-        if (accessRequestConfig && isRequestable) requestParameters.accessProfileV2025.accessRequestConfig = accessRequestConfig
-        
+        if (accessRequestConfig && isRequestable)
+            requestParameters.accessProfileV2025.accessRequestConfig = accessRequestConfig
+
         console.log(`[ISCClient] createAccessProfile payload: ${JSON.stringify(requestParameters, null, 2)}`)
-        
+
         const response = await api.createAccessProfile(requestParameters)
         return response.data
     }
@@ -400,10 +402,7 @@ export class ISCClient {
      * Bulk update entitlements (requestable, privileged, etc.). Max 50 entitlements per request.
      * @see https://developer.sailpoint.com/docs/api/v2025/update-entitlements-in-bulk
      */
-    async updateEntitlementsInBulk(
-        entitlementIds: string[],
-        jsonPatch: JsonPatchOperationV2025[]
-    ): Promise<void> {
+    async updateEntitlementsInBulk(entitlementIds: string[], jsonPatch: JsonPatchOperationV2025[]): Promise<void> {
         const api = new EntitlementsV2025Api(this.config)
         const body: EntitlementBulkUpdateRequestV2025 = {
             entitlementIds,
@@ -510,7 +509,7 @@ export class ISCClient {
             }
             const response = await api.searchPost({ searchV2025: searchRequest })
             const accessProfiles = response.data as any[]
-            
+
             for (const ap of accessProfiles) {
                 if (ap.id && ap.name) {
                     results.push({
@@ -556,8 +555,12 @@ export class ISCClient {
             }
             const response = await api.searchPost({ searchV2025: searchRequest })
             const roles = response.data as any[]
-            logger.debug(`Role search batch ${i / BATCH_SIZE + 1} returned ${roles.length} roles${roles.length > 0 ? ': ' + roles.map((r: any) => r.name).join(', ') : ''}`)
-            
+            logger.debug(
+                `Role search batch ${i / BATCH_SIZE + 1} returned ${roles.length} roles${
+                    roles.length > 0 ? ': ' + roles.map((r: any) => r.name).join(', ') : ''
+                }`
+            )
+
             for (const role of roles) {
                 if (role.id && role.name) {
                     results.push({
@@ -586,10 +589,10 @@ export class ISCClient {
         logger.debug(`Fallback: Searching access profiles by name (${names.length} names)`)
         const api = new AccessProfilesV2025Api(this.config)
         const results: LightweightAccessProfile[] = []
-        
+
         const response = await Paginator.paginate(api, api.listAccessProfiles as any, {})
         const allAccessProfiles = response.data as any[]
-        
+
         for (const accessProfile of allAccessProfiles) {
             if (accessProfile.name && names.includes(accessProfile.name)) {
                 results.push({
@@ -609,7 +612,9 @@ export class ISCClient {
                 })
             }
         }
-        logger.debug(`Fallback: Found ${results.length} access profiles by name: ${results.map(ap => ap.name).join(', ')}`)
+        logger.debug(
+            `Fallback: Found ${results.length} access profiles by name: ${results.map((ap) => ap.name).join(', ')}`
+        )
         return results
     }
 
@@ -624,10 +629,10 @@ export class ISCClient {
         logger.debug(`Fallback: Searching roles by name (${names.length} names)`)
         const api = new RolesV2025Api(this.config)
         const results: LightweightRole[] = []
-        
+
         const response = await Paginator.paginate(api, api.listRoles as any, {})
         const allRoles = response.data as RoleV2025[]
-        
+
         for (const role of allRoles) {
             if (role.name && names.includes(role.name)) {
                 results.push({
@@ -641,7 +646,7 @@ export class ISCClient {
                 })
             }
         }
-        logger.debug(`Fallback: Found ${results.length} roles by name: ${results.map(r => r.name).join(', ')}`)
+        logger.debug(`Fallback: Found ${results.length} roles by name: ${results.map((r) => r.name).join(', ')}`)
         return results
     }
 }

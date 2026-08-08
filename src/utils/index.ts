@@ -71,31 +71,3 @@ export const escapeFilterString = (value: string): string => {
     if (!value) return value
     return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
-
-// ⚡ Bolt: Worker-pool implementation for concurrent processing
-export const processConcurrent = async <T, R>(
-    items: T[],
-    processor: (item: T) => Promise<R>,
-    concurrency: number = 10
-): Promise<R[]> => {
-    const results: R[] = new Array(items.length)
-    let currentIndex = 0
-
-    const worker = async () => {
-        while (true) {
-            const index = currentIndex++
-            if (index >= items.length) {
-                break
-            }
-            results[index] = await processor(items[index])
-        }
-    }
-
-    const workers: Promise<void>[] = []
-    for (let i = 0; i < Math.min(concurrency, items.length); i++) {
-        workers.push(worker())
-    }
-
-    await Promise.all(workers)
-    return results
-}
