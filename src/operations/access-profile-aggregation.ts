@@ -91,11 +91,17 @@ async function processAccessProfiles(
     const sourceCache = new Map<string, SourceAppV2025>()
     const uniqueSourceIds = new Set(accessProfiles.map((ap) => ap.sourceId))
 
-    const sourceResults = await Promise.allSettled(
-        Array.from(uniqueSourceIds).map(async (sourceId) => {
-            const source = await isc.getSource(sourceId)
-            return { sourceId, source }
-        })
+    const sourceResults = await runWithConcurrency(
+        Array.from(uniqueSourceIds),
+        API_CONCURRENCY,
+        async (sourceId) => {
+            try {
+                const source = await isc.getSource(sourceId)
+                return { status: 'fulfilled' as const, value: { sourceId, source } }
+            } catch (error) {
+                return { status: 'rejected' as const, reason: error }
+            }
+        }
     )
 
     for (const result of sourceResults) {
@@ -135,77 +141,83 @@ async function processAccessProfiles(
 
     // Create/update access profiles in parallel
     const apNameToIdMap = new Map<string, string>()
-    const results = await Promise.allSettled(
-        accessProfiles.map(async (apData) => {
-            const existingAp = existingApMap.get(apData.name)
-            const entitlementRefs = apData.entitlements.map(entitlementToRef)
-            const source = sourceCache.get(apData.sourceId)
+    const results = await runWithConcurrency(
+        accessProfiles,
+        API_CONCURRENCY,
+        async (apData) => {
+            try {
+                const existingAp = existingApMap.get(apData.name)
+                const entitlementRefs = apData.entitlements.map(entitlementToRef)
+                const source = sourceCache.get(apData.sourceId)
 
-            if (!source) {
-                logger.error(`Source ${apData.sourceId} not found in cache, skipping AP ${apData.name}`)
-                return { name: apData.name, id: undefined }
-            }
-
-            if (!source.owner?.id) {
-                logger.error(`Source ${apData.sourceId} has no owner, skipping AP ${apData.name}`)
-                return { name: apData.name, id: undefined }
-            }
-
-            const ownerId = source.owner.id
-
-            const accessRequestConfig = definition.approverType
-                ? (buildApprovalSchemesConfig(definition.approverType) as RequestabilityV2025)
-                : undefined
-
-            let apId: string | undefined
-
-            if (existingAp?.id) {
-                // Update existing
-                const changes = detectRequestableAndConfigChanges(
-                    existingAp,
-                    entitlementRefs,
-                    definition.requestable,
-                    accessRequestConfig
-                )
-                if (shouldSkipUpdate(changes)) {
-                    logger.debug(`No changes for access profile ${apData.name}, keeping existing`)
-                    apId = existingAp.id
-                } else {
-                    try {
-                        const updated = await isc.updateAccessProfile(
-                            existingAp.id,
-                            buildEntitlementPatch(entitlementRefs, {
-                                requestable: definition.requestable,
-                                accessRequestConfig,
-                                changes,
-                            })
-                        )
-                        apId = updated.id!
-                        logger.info(`Updated access profile: ${apData.name}`)
-                    } catch (error) {
-                        logger.error(`Error updating access profile ${apData.name}: ${getErrorMessage(error)}`)
-                    }
+                if (!source) {
+                    logger.error(`Source ${apData.sourceId} not found in cache, skipping AP ${apData.name}`)
+                    return { status: 'fulfilled' as const, value: { name: apData.name, id: undefined } }
                 }
-            } else {
-                // Create new
-                try {
-                    const created = await isc.createAccessProfile(
-                        apData.name,
-                        ownerId,
-                        apData.sourceId,
+
+                if (!source.owner?.id) {
+                    logger.error(`Source ${apData.sourceId} has no owner, skipping AP ${apData.name}`)
+                    return { status: 'fulfilled' as const, value: { name: apData.name, id: undefined } }
+                }
+
+                const ownerId = source.owner.id
+
+                const accessRequestConfig = definition.approverType
+                    ? (buildApprovalSchemesConfig(definition.approverType) as RequestabilityV2025)
+                    : undefined
+
+                let apId: string | undefined
+
+                if (existingAp?.id) {
+                    // Update existing
+                    const changes = detectRequestableAndConfigChanges(
+                        existingAp,
                         entitlementRefs,
                         definition.requestable,
                         accessRequestConfig
                     )
-                    apId = created.id!
-                    logger.info(`Created access profile: ${apData.name}`)
-                } catch (error) {
-                    logger.error(`Error creating access profile ${apData.name}: ${getErrorMessage(error)}`)
+                    if (shouldSkipUpdate(changes)) {
+                        logger.debug(`No changes for access profile ${apData.name}, keeping existing`)
+                        apId = existingAp.id
+                    } else {
+                        try {
+                            const updated = await isc.updateAccessProfile(
+                                existingAp.id,
+                                buildEntitlementPatch(entitlementRefs, {
+                                    requestable: definition.requestable,
+                                    accessRequestConfig,
+                                    changes,
+                                })
+                            )
+                            apId = updated.id!
+                            logger.info(`Updated access profile: ${apData.name}`)
+                        } catch (error) {
+                            logger.error(`Error updating access profile ${apData.name}: ${getErrorMessage(error)}`)
+                        }
+                    }
+                } else {
+                    // Create new
+                    try {
+                        const created = await isc.createAccessProfile(
+                            apData.name,
+                            ownerId,
+                            apData.sourceId,
+                            entitlementRefs,
+                            definition.requestable,
+                            accessRequestConfig
+                        )
+                        apId = created.id!
+                        logger.info(`Created access profile: ${apData.name}`)
+                    } catch (error) {
+                        logger.error(`Error creating access profile ${apData.name}: ${getErrorMessage(error)}`)
+                    }
                 }
-            }
 
-            return { name: apData.name, id: apId }
-        })
+                return { status: 'fulfilled' as const, value: { name: apData.name, id: apId } }
+            } catch (error) {
+                return { status: 'rejected' as const, reason: error }
+            }
+        }
     )
 
     // Collect successful results
