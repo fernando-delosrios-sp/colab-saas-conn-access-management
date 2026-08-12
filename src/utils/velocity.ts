@@ -1,19 +1,42 @@
 import velocityjs from 'velocityjs'
 
-function isUnsafeVelocityAST(nodes: any): boolean {
+function evaluateExpression(expr: any, env: Map<string, string>): string | null {
+    if (!expr) return null
+    if (expr.type === 'string') return expr.value
+    if (expr.type === 'references') return env.get(expr.id) || null
+    if (expr.type === 'math' && expr.operator === '+') {
+        const left = evaluateExpression(expr.expression[0], env)
+        const right = evaluateExpression(expr.expression[1], env)
+        if (left !== null && right !== null) {
+            return left + right
+        }
+    }
+    return null
+}
+
+function isUnsafeVelocityAST(nodes: any, env: Map<string, string> = new Map()): boolean {
     if (!nodes) return false
 
     if (Array.isArray(nodes)) {
         for (const node of nodes) {
-            if (isUnsafeVelocityAST(node)) return true
+            if (isUnsafeVelocityAST(node, env)) return true
         }
         return false
     }
 
     if (typeof nodes === 'object') {
-        const id = nodes.id
+        if (nodes.type === 'set' && nodes.equal && nodes.equal.length === 2) {
+            const left = nodes.equal[0]
+            const right = nodes.equal[1]
+            if (left.type === 'references' && left.id) {
+                const val = evaluateExpression(right, env)
+                if (val !== null) {
+                    env.set(left.id, val)
+                }
+            }
+        }
 
-        // Block macro evaluation logic
+        const id = nodes.id
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
         if (
@@ -27,8 +50,16 @@ function isUnsafeVelocityAST(nodes: any): boolean {
         )
             return true
 
+        // Check if dynamic index accesses resolve to dangerous properties
+        if (nodes.type === 'index' && id) {
+            const val = evaluateExpression(id, env)
+            if (val && (val === 'constructor' || val === '__proto__' || val === 'prototype')) {
+                return true
+            }
+        }
+
         for (const key of Object.keys(nodes)) {
-            if (isUnsafeVelocityAST(nodes[key])) return true
+            if (isUnsafeVelocityAST(nodes[key], env)) return true
         }
     }
 
@@ -46,10 +77,7 @@ const templateCache = new Map<string, any>()
  * @returns Rendered string
  * @throws Error if template parsing or rendering fails
  */
-export function evaluateVelocityExpression(
-    template: string,
-    context: Record<string, unknown> = {}
-): string {
+export function evaluateVelocityExpression(template: string, context: Record<string, unknown> = {}): string {
     let velocity = templateCache.get(template)
     if (!velocity) {
         const velocityTemplate = velocityjs.parse(template)
