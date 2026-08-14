@@ -12,6 +12,7 @@ import {
     evaluateVelocityExpression,
     pushToGroupMap,
     runWithConcurrency,
+    processConcurrent,
     searchWithFallback,
     shouldSkipUpdate,
     stringToMembership,
@@ -51,11 +52,26 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
         (d) => d.deleteStaleRoles === true || String(d.deleteStaleRoles) === 'true'
     )
 
+    // Pre-fetch entitlements for all unique queries
+    const uniqueQueries = Array.from(new Set(config.roles!.map((d) => d.query)))
+    const queryToEntitlements = new Map<string, EntitlementV2025[]>()
+    await processConcurrent(
+        uniqueQueries,
+        async (query) => {
+            const ents = await isc.listEntitlements(query)
+            queryToEntitlements.set(query, ents)
+            return ents
+        },
+        API_CONCURRENCY
+    )
+
     // Phase 1: Collect entitlements and group them per definition
     roles: for (const definition of config.roles!) {
         logger.debug(`Processing definition: ${definition.name}`)
         entitlementMap.clear()
-        const entitlements = await isc.listEntitlements(definition.query)
+
+        // ⚡ Bolt: Replaced O(N) API calls in loop with O(1) map lookup
+        const entitlements = queryToEntitlements.get(definition.query) || []
         logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
 
         // Collect entitlement IDs (for a single search later)

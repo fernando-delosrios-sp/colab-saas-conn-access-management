@@ -60,9 +60,7 @@ export async function aggregateEntitlements(config: Config, isc: ISCClient): Pro
             })
             const name = evaluateVelocityExpression(definition.entitlementExpression, context)
             if (!name) {
-                logger.info(
-                    `Skipping entitlement ${entitlement.id}: expression evaluated to empty`
-                )
+                logger.info(`Skipping entitlement ${entitlement.id}: expression evaluated to empty`)
                 continue
             }
             selected.push(entitlement)
@@ -104,12 +102,12 @@ export async function aggregateEntitlements(config: Config, isc: ISCClient): Pro
             const chunks = chunk(entitlementIds, BULK_UPDATE_CHUNK_SIZE)
             for (let i = 0; i < chunks.length; i++) {
                 try {
-                    logger.debug(
-                        `Bulk updating ${chunks[i].length} entitlements (chunk ${i + 1}/${chunks.length})`
-                    )
+                    logger.debug(`Bulk updating ${chunks[i].length} entitlements (chunk ${i + 1}/${chunks.length})`)
                     await isc.updateEntitlementsInBulk(chunks[i], jsonPatch)
                 } catch (error) {
-                    logger.error(`Error bulk updating entitlements chunk ${i + 1}/${chunks.length} for definition ${definition.name}: ${error}`)
+                    logger.error(
+                        `Error bulk updating entitlements chunk ${i + 1}/${chunks.length} for definition ${definition.name}: ${error}`
+                    )
                     // Continue with remaining chunks instead of breaking
                 }
             }
