@@ -25,7 +25,9 @@ export const retriesConfig: IAxiosRetryConfig = {
     },
     onRetry: (retryCount, error, requestConfig) => {
         const status = error.response?.status || 'Network Error'
-        const retryAfter = error.response?.headers ? (error.response.headers as AxiosResponseHeaders).get('retry-after') : null
+        const retryAfter = error.response?.headers
+            ? (error.response.headers as AxiosResponseHeaders).get('retry-after')
+            : null
         const delay = retryAfter || Math.min(Math.pow(2, retryCount) * 1000, 60 * 1000) / 1000
         const delayType = retryAfter ? 'server-specified' : 'exponential backoff'
 

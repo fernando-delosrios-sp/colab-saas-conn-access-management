@@ -9,4 +9,3 @@ jobs:
     build_and_release:
         name: Build and Release
         uses: sailpoint-oss/.github/.github/workflows/colab-saas-connectivity-release.yml@v1
-
