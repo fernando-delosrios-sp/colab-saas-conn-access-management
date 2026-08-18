@@ -62,3 +62,7 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2024-05-30 - [Batch API Calls Instead of Client-Side Filtering]
+**Learning:** The fallback search methods for access profiles and roles (`searchAccessProfilesByNames`, `searchRolesByNames`) were paginating over the entire tenant's directory (fetching all records) and filtering client-side. This is O(N) over all tenant records, causing massive network overhead, rate limits, and memory spikes for large environments.
+**Action:** Always utilize server-side filtering (e.g., the `in` operator) when looking up multiple specific items by name. Reused existing batched, concurrent lookup utilities (`getAccessProfilesByNames`, `getRolesByNames`) which fetch records in chunks of 30 using `name in ("x", "y")` to eliminate full tenant scans.
