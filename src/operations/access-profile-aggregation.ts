@@ -91,12 +91,20 @@ async function processAccessProfiles(
     const sourceCache = new Map<string, SourceAppV2025>()
     const uniqueSourceIds = new Set(accessProfiles.map((ap) => ap.sourceId))
 
-    const sourceResults = await Promise.allSettled(
-        Array.from(uniqueSourceIds).map(async (sourceId) => {
+    const sourceResults = await runWithConcurrency(Array.from(uniqueSourceIds), API_CONCURRENCY, async (sourceId) => {
+        try {
             const source = await isc.getSource(sourceId)
-            return { sourceId, source }
-        })
-    )
+            return { status: 'fulfilled', value: { sourceId, source } } as PromiseSettledResult<{
+                sourceId: string
+                source: SourceAppV2025
+            }>
+        } catch (error) {
+            return { status: 'rejected', reason: error } as PromiseSettledResult<{
+                sourceId: string
+                source: SourceAppV2025
+            }>
+        }
+    })
 
     for (const result of sourceResults) {
         if (result.status === 'fulfilled') {
@@ -135,20 +143,26 @@ async function processAccessProfiles(
 
     // Create/update access profiles in parallel
     const apNameToIdMap = new Map<string, string>()
-    const results = await Promise.allSettled(
-        accessProfiles.map(async (apData) => {
+    const results = await runWithConcurrency(accessProfiles, API_CONCURRENCY, async (apData) => {
+        try {
             const existingAp = existingApMap.get(apData.name)
             const entitlementRefs = apData.entitlements.map(entitlementToRef)
             const source = sourceCache.get(apData.sourceId)
 
             if (!source) {
                 logger.error(`Source ${apData.sourceId} not found in cache, skipping AP ${apData.name}`)
-                return { name: apData.name, id: undefined }
+                return { status: 'fulfilled', value: { name: apData.name, id: undefined } } as PromiseSettledResult<{
+                    name: string
+                    id: string | undefined
+                }>
             }
 
             if (!source.owner?.id) {
                 logger.error(`Source ${apData.sourceId} has no owner, skipping AP ${apData.name}`)
-                return { name: apData.name, id: undefined }
+                return { status: 'fulfilled', value: { name: apData.name, id: undefined } } as PromiseSettledResult<{
+                    name: string
+                    id: string | undefined
+                }>
             }
 
             const ownerId = source.owner.id
@@ -204,9 +218,17 @@ async function processAccessProfiles(
                 }
             }
 
-            return { name: apData.name, id: apId }
-        })
-    )
+            return { status: 'fulfilled', value: { name: apData.name, id: apId } } as PromiseSettledResult<{
+                name: string
+                id: string | undefined
+            }>
+        } catch (error) {
+            return { status: 'rejected', reason: error } as PromiseSettledResult<{
+                name: string
+                id: string | undefined
+            }>
+        }
+    })
 
     // Collect successful results
     for (const result of results) {
