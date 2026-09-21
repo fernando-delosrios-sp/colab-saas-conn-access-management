@@ -62,3 +62,6 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+## 2024-08-24 - Replace unbounded Promise.allSettled with concurrency limiter
+**Learning:** Using unbounded Promise.allSettled for large arrays of concurrent API requests causes rate limits (HTTP 429) and socket exhaustion.
+**Action:** Always wrap concurrent network operations in a concurrency limiter like runWithConcurrency to batch operations, and ensure the worker logic is wrapped in a try/catch returning a PromiseSettledResult-like object.
