@@ -1,5 +1,5 @@
 import { logger, ConnectorError } from '@sailpoint/connector-sdk'
-import { EntitlementV2025, RequestabilityForRoleV2025 } from 'sailpoint-api-client'
+import { EntitlementV2026, RequestabilityForRoleV2026 } from 'sailpoint-api-client'
 import { ISCClient, LightweightRole } from '../isc-client'
 import { Config } from '../model/config'
 import { RoleProperties } from '../model/propertyDefinitions'
@@ -32,7 +32,7 @@ const API_CONCURRENCY = 8
  */
 export async function aggregateRoles(config: Config, isc: ISCClient): Promise<void> {
     const roleMap = new Map<string, RoleProperties>()
-    const entitlementMap = new Map<string, EntitlementV2025[]>()
+    const entitlementMap = new Map<string, EntitlementV2026[]>()
     const existingRoleMap = new Map<string, LightweightRole>()
     const allEntitlementIds = new Set<string>()
 
@@ -112,7 +112,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             if (definition.approverType) {
                 roleProperties.accessRequestConfig = buildApprovalSchemesConfig(
                     definition.approverType
-                ) as RequestabilityForRoleV2025
+                ) as RequestabilityForRoleV2026
             }
 
             // Evaluate membership assignment definition

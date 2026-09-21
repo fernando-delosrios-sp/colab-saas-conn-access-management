@@ -1,39 +1,38 @@
 import {
-    AccessProfilesV2025Api,
-    AccessProfilesV2025ApiCreateAccessProfileRequest,
-    AccessProfilesV2025ApiListAccessProfilesRequest,
-    AccessProfileV2025,
-    AppsV2025Api,
-    AppsV2025ApiCreateSourceAppRequest,
-    AppsV2025ApiGetSourceAppRequest,
-    AppsV2025ApiListAccessProfilesForSourceAppRequest,
-    AppsV2025ApiListAllSourceAppRequest,
+    AccessProfilesV2026Api,
+    AccessProfilesV2026ApiCreateAccessProfileRequest,
+    AccessProfilesV2026ApiListAccessProfilesRequest,
+    AccessProfileV2026,
+    AppsV2026Api,
+    AppsV2026ApiCreateSourceAppRequest,
+    AppsV2026ApiGetSourceAppRequest,
+    AppsV2026ApiListAccessProfilesForSourceAppRequest,
+    AppsV2026ApiListAllSourceAppRequest,
     Configuration,
     ConfigurationParameters,
-    EntitlementBulkUpdateRequestV2025,
-    EntitlementRefV2025,
-    EntitlementRequestConfigV2025,
-    EntitlementsV2025Api,
-    EntitlementsV2025ApiListEntitlementsRequest,
-    EntitlementsV2025ApiPutEntitlementRequestConfigRequest,
-    EntitlementsV2025ApiUpdateEntitlementsInBulkRequest,
-    EntitlementV2025,
-    JsonPatchOperationV2025,
+    EntitlementBulkUpdateRequestV2026,
+    EntitlementRefV2026,
+    EntitlementRequestConfigV2026,
+    EntitlementsV2026Api,
+    EntitlementsV2026ApiListEntitlementsRequest,
+    EntitlementsV2026ApiPutEntitlementRequestConfigRequest,
+    EntitlementsV2026ApiUpdateEntitlementsInBulkRequest,
+    EntitlementV2026,
+    JsonPatchOperationV2026,
     Paginator,
-    PublicIdentitiesConfigApi,
-    PublicIdentityConfig,
-    RequestabilityForRoleV2025,
-    RequestabilityV2025,
-    RoleMembershipSelectorV2025,
-    RolesV2025Api,
-    RolesV2025ApiCreateRoleRequest,
-    RolesV2025ApiListRolesRequest,
-    RoleV2025,
-    SearchV2025,
-    SearchV2025Api,
-    SourceAppV2025,
-    SourcesApi,
-    SourcesV2025Api,
+    PublicIdentitiesConfigV2026Api,
+    PublicIdentityConfigV2026,
+    RequestabilityForRoleV2026,
+    RequestabilityV2026,
+    RoleMembershipSelectorV2026,
+    RolesV2026Api,
+    RolesV2026ApiCreateRoleRequest,
+    RolesV2026ApiListRolesRequest,
+    RoleV2026,
+    SearchV2026,
+    SearchV2026Api,
+    SourceAppV2026,
+    SourcesV2026Api,
 } from 'sailpoint-api-client'
 import { logger } from '@sailpoint/connector-sdk'
 import axios from 'axios'
@@ -126,21 +125,21 @@ export class ISCClient {
         ApiClass: new (config: Configuration) => any,
         methodName: string,
         id: string,
-        jsonPatchOperationV2025: JsonPatchOperationV2025[],
+        jsonPatchOperationV2026: JsonPatchOperationV2026[],
         additionalParams: Record<string, any> = {}
     ): Promise<T> {
         const api = new ApiClass(this.config)
         const requestParameters = {
             id,
-            jsonPatchOperationV2025,
+            jsonPatchOperationV2026,
             ...additionalParams,
         }
         const response = await api[methodName](requestParameters)
         return response.data
     }
 
-    async getPublicIdentityConfig(): Promise<PublicIdentityConfig> {
-        const api = new PublicIdentitiesConfigApi(this.config)
+    async getPublicIdentityConfig(): Promise<PublicIdentityConfigV2026> {
+        const api = new PublicIdentitiesConfigV2026Api(this.config)
 
         const response = await api.getPublicIdentityConfig()
 
@@ -148,34 +147,34 @@ export class ISCClient {
     }
 
     async listSources() {
-        const api = new SourcesApi(this.config)
+        const api = new SourcesV2026Api(this.config)
 
         const response = await Paginator.paginate(api, api.listSources)
 
         return response.data
     }
 
-    async listEntitlements(filters: string): Promise<EntitlementV2025[]> {
-        const api = new EntitlementsV2025Api(this.config)
-        const requestParameters: EntitlementsV2025ApiListEntitlementsRequest = {
+    async listEntitlements(filters: string): Promise<EntitlementV2026[]> {
+        const api = new EntitlementsV2026Api(this.config)
+        const requestParameters: EntitlementsV2026ApiListEntitlementsRequest = {
             filters,
         }
         const response = await Paginator.paginate(api, api.listEntitlements, requestParameters)
-        return response.data as EntitlementV2025[]
+        return response.data as EntitlementV2026[]
     }
 
-    async getAccessProfileByName(name: string): Promise<AccessProfileV2025 | undefined> {
-        const api = new AccessProfilesV2025Api(this.config)
+    async getAccessProfileByName(name: string): Promise<AccessProfileV2026 | undefined> {
+        const api = new AccessProfilesV2026Api(this.config)
         const filters = `name eq "${escapeFilterString(name)}"`
-        const requestParameters: AccessProfilesV2025ApiListAccessProfilesRequest = {
+        const requestParameters: AccessProfilesV2026ApiListAccessProfilesRequest = {
             filters,
         }
         const response = await api.listAccessProfiles(requestParameters)
         return response.data[0] ? response.data[0] : undefined
     }
 
-    async getAccessProfilesByNames(names: string[]): Promise<AccessProfileV2025[]> {
-        const api = new AccessProfilesV2025Api(this.config)
+    async getAccessProfilesByNames(names: string[]): Promise<AccessProfileV2026[]> {
+        const api = new AccessProfilesV2026Api(this.config)
 
         // Chunk names to avoid URI too long errors
         const chunkSize = 30
@@ -187,7 +186,7 @@ export class ISCClient {
         const results = await processConcurrent(chunks, async (chunk) => {
             const escapedNames = chunk.map((name) => `"${escapeFilterString(name)}"`).join(', ')
             const filters = `name in (${escapedNames})`
-            const requestParameters: AccessProfilesV2025ApiListAccessProfilesRequest = {
+            const requestParameters: AccessProfilesV2026ApiListAccessProfilesRequest = {
                 filters,
             }
             const response = await api.listAccessProfiles(requestParameters)
@@ -197,18 +196,18 @@ export class ISCClient {
         return results.flat()
     }
 
-    async getRoleByName(name: string): Promise<RoleV2025 | undefined> {
-        const api = new RolesV2025Api(this.config)
+    async getRoleByName(name: string): Promise<RoleV2026 | undefined> {
+        const api = new RolesV2026Api(this.config)
         const filters = `name eq "${escapeFilterString(name)}"`
-        const requestParameters: RolesV2025ApiListRolesRequest = {
+        const requestParameters: RolesV2026ApiListRolesRequest = {
             filters,
         }
         const response = await api.listRoles(requestParameters)
         return response.data[0] ? response.data[0] : undefined
     }
 
-    async getRolesByNames(names: string[]): Promise<RoleV2025[]> {
-        const api = new RolesV2025Api(this.config)
+    async getRolesByNames(names: string[]): Promise<RoleV2026[]> {
+        const api = new RolesV2026Api(this.config)
 
         const chunkSize = 30
         const chunks: string[][] = []
@@ -219,7 +218,7 @@ export class ISCClient {
         const results = await processConcurrent(chunks, async (chunk) => {
             const escapedNames = chunk.map((name) => `"${escapeFilterString(name)}"`).join(', ')
             const filters = `name in (${escapedNames})`
-            const requestParameters: RolesV2025ApiListRolesRequest = {
+            const requestParameters: RolesV2026ApiListRolesRequest = {
                 filters,
             }
             const response = await api.listRoles(requestParameters)
@@ -229,8 +228,8 @@ export class ISCClient {
         return results.flat()
     }
 
-    async getAppsByNames(names: string[]): Promise<SourceAppV2025[]> {
-        const api = new AppsV2025Api(this.config)
+    async getAppsByNames(names: string[]): Promise<SourceAppV2026[]> {
+        const api = new AppsV2026Api(this.config)
 
         const chunkSize = 30
         const chunks: string[][] = []
@@ -241,7 +240,7 @@ export class ISCClient {
         const results = await processConcurrent(chunks, async (chunk) => {
             const escapedNames = chunk.map((name) => `"${escapeFilterString(name)}"`).join(', ')
             const filters = `name in (${escapedNames})`
-            const requestParameters: AppsV2025ApiListAllSourceAppRequest = {
+            const requestParameters: AppsV2026ApiListAllSourceAppRequest = {
                 filters,
             }
             const response = await api.listAllSourceApp(requestParameters)
@@ -251,10 +250,10 @@ export class ISCClient {
         return results.flat()
     }
 
-    async getAppByName(name: string): Promise<SourceAppV2025 | undefined> {
-        const api = new AppsV2025Api(this.config)
+    async getAppByName(name: string): Promise<SourceAppV2026 | undefined> {
+        const api = new AppsV2026Api(this.config)
         const filters = `name eq "${escapeFilterString(name)}"`
-        const requestParameters: AppsV2025ApiListAllSourceAppRequest = {
+        const requestParameters: AppsV2026ApiListAllSourceAppRequest = {
             filters,
         }
 
@@ -262,9 +261,9 @@ export class ISCClient {
         return response.data[0] ? response.data[0] : undefined
     }
 
-    async getAppById(id: string): Promise<SourceAppV2025> {
-        const api = new AppsV2025Api(this.config)
-        const requestParameters: AppsV2025ApiGetSourceAppRequest = {
+    async getAppById(id: string): Promise<SourceAppV2026> {
+        const api = new AppsV2026Api(this.config)
+        const requestParameters: AppsV2026ApiGetSourceAppRequest = {
             id,
             xSailPointExperimental: 'true',
         }
@@ -273,8 +272,8 @@ export class ISCClient {
     }
 
     async getAppAccessProfiles(appId: string): Promise<string[]> {
-        const api = new AppsV2025Api(this.config)
-        const requestParameters: AppsV2025ApiListAccessProfilesForSourceAppRequest = {
+        const api = new AppsV2026Api(this.config)
+        const requestParameters: AppsV2026ApiListAccessProfilesForSourceAppRequest = {
             id: appId,
             xSailPointExperimental: 'true',
         }
@@ -282,10 +281,10 @@ export class ISCClient {
         return response.data.map((ap: any) => ap.id).filter(Boolean)
     }
 
-    async createApp(name: string, sourceId: string): Promise<SourceAppV2025> {
-        const api = new AppsV2025Api(this.config)
-        const requestParameters: AppsV2025ApiCreateSourceAppRequest = {
-            sourceAppCreateDtoV2025: {
+    async createApp(name: string, sourceId: string): Promise<SourceAppV2026> {
+        const api = new AppsV2026Api(this.config)
+        const requestParameters: AppsV2026ApiCreateSourceAppRequest = {
+            sourceAppCreateDtoV2026: {
                 name,
                 description: name,
                 accountSource: {
@@ -300,16 +299,16 @@ export class ISCClient {
 
     async updateSourceAccessProfiles(
         id: string,
-        jsonPatchOperationV2025: JsonPatchOperationV2025[]
-    ): Promise<SourceAppV2025> {
-        return this.patchResource<SourceAppV2025>(AppsV2025Api, 'patchSourceApp', id, jsonPatchOperationV2025, {
+        jsonPatchOperationV2026: JsonPatchOperationV2026[]
+    ): Promise<SourceAppV2026> {
+        return this.patchResource<SourceAppV2026>(AppsV2026Api, 'patchSourceApp', id, jsonPatchOperationV2026, {
             xSailPointExperimental: 'true',
         })
     }
 
-    async getSource(id: string): Promise<SourceAppV2025> {
-        const api = new SourcesV2025Api(this.config)
-        const requestParameters: AppsV2025ApiGetSourceAppRequest = {
+    async getSource(id: string): Promise<SourceAppV2026> {
+        const api = new SourcesV2026Api(this.config)
+        const requestParameters: AppsV2026ApiGetSourceAppRequest = {
             id,
         }
         const response = await api.getSource(requestParameters)
@@ -320,14 +319,14 @@ export class ISCClient {
         name: string,
         ownerId: string,
         sourceId: string,
-        entitlements: EntitlementRefV2025[],
+        entitlements: EntitlementRefV2026[],
         requestable: any = false,
-        accessRequestConfig?: RequestabilityV2025
-    ): Promise<AccessProfileV2025> {
+        accessRequestConfig?: RequestabilityV2026
+    ): Promise<AccessProfileV2026> {
         const isRequestable = requestable === true || String(requestable) === 'true'
-        const api = new AccessProfilesV2025Api(this.config)
-        const requestParameters: AccessProfilesV2025ApiCreateAccessProfileRequest = {
-            accessProfileV2025: {
+        const api = new AccessProfilesV2026Api(this.config)
+        const requestParameters: AccessProfilesV2026ApiCreateAccessProfileRequest = {
+            accessProfileV2026: {
                 name,
                 description: name,
                 owner: {
@@ -343,7 +342,7 @@ export class ISCClient {
                 requestable: isRequestable,
             },
         }
-        if (accessRequestConfig && isRequestable) requestParameters.accessProfileV2025.accessRequestConfig = accessRequestConfig
+        if (accessRequestConfig && isRequestable) requestParameters.accessProfileV2026.accessRequestConfig = accessRequestConfig
         
         console.log(`[ISCClient] createAccessProfile payload: ${JSON.stringify(requestParameters, null, 2)}`)
         
@@ -353,27 +352,27 @@ export class ISCClient {
 
     async updateAccessProfile(
         id: string,
-        jsonPatchOperationV2025: JsonPatchOperationV2025[]
-    ): Promise<AccessProfileV2025> {
-        return this.patchResource<AccessProfileV2025>(
-            AccessProfilesV2025Api,
+        jsonPatchOperationV2026: JsonPatchOperationV2026[]
+    ): Promise<AccessProfileV2026> {
+        return this.patchResource<AccessProfileV2026>(
+            AccessProfilesV2026Api,
             'patchAccessProfile',
             id,
-            jsonPatchOperationV2025
+            jsonPatchOperationV2026
         )
     }
 
     async createRole(
         name: string,
         ownerId: string,
-        entitlements: EntitlementRefV2025[],
+        entitlements: EntitlementRefV2026[],
         requestable: boolean = false,
-        accessRequestConfig?: RequestabilityForRoleV2025,
-        membership?: RoleMembershipSelectorV2025
-    ): Promise<RoleV2025> {
-        const api = new RolesV2025Api(this.config)
-        const requestParameters: RolesV2025ApiCreateRoleRequest = {
-            roleV2025: {
+        accessRequestConfig?: RequestabilityForRoleV2026,
+        membership?: RoleMembershipSelectorV2026
+    ): Promise<RoleV2026> {
+        const api = new RolesV2026Api(this.config)
+        const requestParameters: RolesV2026ApiCreateRoleRequest = {
+            roleV2026: {
                 name,
                 description: name,
                 owner: {
@@ -386,47 +385,47 @@ export class ISCClient {
                 enabled: true,
             },
         }
-        if (accessRequestConfig) requestParameters.roleV2025.accessRequestConfig = accessRequestConfig
-        if (membership) requestParameters.roleV2025.membership = membership
+        if (accessRequestConfig) requestParameters.roleV2026.accessRequestConfig = accessRequestConfig
+        if (membership) requestParameters.roleV2026.membership = membership
         const response = await api.createRole(requestParameters)
         return response.data
     }
 
-    async updateRole(id: string, jsonPatchOperationV2025: JsonPatchOperationV2025[]): Promise<RoleV2025> {
-        return this.patchResource<RoleV2025>(RolesV2025Api, 'patchRole', id, jsonPatchOperationV2025)
+    async updateRole(id: string, jsonPatchOperationV2026: JsonPatchOperationV2026[]): Promise<RoleV2026> {
+        return this.patchResource<RoleV2026>(RolesV2026Api, 'patchRole', id, jsonPatchOperationV2026)
     }
 
     /**
      * Bulk update entitlements (requestable, privileged, etc.). Max 50 entitlements per request.
-     * @see https://developer.sailpoint.com/docs/api/v2025/update-entitlements-in-bulk
+     * @see https://developer.sailpoint.com/docs/api/v2026/update-entitlements-in-bulk
      */
     async updateEntitlementsInBulk(
         entitlementIds: string[],
-        jsonPatch: JsonPatchOperationV2025[]
+        jsonPatch: JsonPatchOperationV2026[]
     ): Promise<void> {
-        const api = new EntitlementsV2025Api(this.config)
-        const body: EntitlementBulkUpdateRequestV2025 = {
+        const api = new EntitlementsV2026Api(this.config)
+        const body: EntitlementBulkUpdateRequestV2026 = {
             entitlementIds,
             jsonPatch,
         }
-        const requestParameters: EntitlementsV2025ApiUpdateEntitlementsInBulkRequest = {
-            entitlementBulkUpdateRequestV2025: body,
+        const requestParameters: EntitlementsV2026ApiUpdateEntitlementsInBulkRequest = {
+            entitlementBulkUpdateRequestV2026: body,
         }
         await api.updateEntitlementsInBulk(requestParameters)
     }
 
     /**
      * Replace entitlement request config (approval schemes) for a single entitlement.
-     * @see https://developer.sailpoint.com/docs/api/v2025/put-entitlement-request-config
+     * @see https://developer.sailpoint.com/docs/api/v2026/put-entitlement-request-config
      */
     async putEntitlementRequestConfig(
         id: string,
-        entitlementRequestConfigV2025: EntitlementRequestConfigV2025
-    ): Promise<EntitlementRequestConfigV2025> {
-        const api = new EntitlementsV2025Api(this.config)
-        const requestParameters: EntitlementsV2025ApiPutEntitlementRequestConfigRequest = {
+        entitlementRequestConfigV2026: EntitlementRequestConfigV2026
+    ): Promise<EntitlementRequestConfigV2026> {
+        const api = new EntitlementsV2026Api(this.config)
+        const requestParameters: EntitlementsV2026ApiPutEntitlementRequestConfigRequest = {
             id,
-            entitlementRequestConfigV2025,
+            entitlementRequestConfigV2026,
         }
         const response = await api.putEntitlementRequestConfig(requestParameters)
         return response.data
@@ -435,57 +434,57 @@ export class ISCClient {
     /**
      * List access profiles filtered by source IDs. Uses source.id in ("id1","id2") filter.
      */
-    async listAccessProfilesBySources(sourceIds: string[]): Promise<AccessProfileV2025[]> {
+    async listAccessProfilesBySources(sourceIds: string[]): Promise<AccessProfileV2026[]> {
         if (sourceIds.length === 0) return []
-        const api = new AccessProfilesV2025Api(this.config)
+        const api = new AccessProfilesV2026Api(this.config)
         const filterValue = sourceIds.map((id) => `"${id}"`).join(',')
         const filters = `source.id in (${filterValue})`
-        const requestParameters: AccessProfilesV2025ApiListAccessProfilesRequest = { filters }
+        const requestParameters: AccessProfilesV2026ApiListAccessProfilesRequest = { filters }
         const response = await Paginator.paginate(api, api.listAccessProfiles as any, requestParameters)
-        return response.data as AccessProfileV2025[]
+        return response.data as AccessProfileV2026[]
     }
 
     /**
      * List source apps filtered by account source IDs.
      */
-    async listAppsBySources(sourceIds: string[]): Promise<SourceAppV2025[]> {
+    async listAppsBySources(sourceIds: string[]): Promise<SourceAppV2026[]> {
         if (sourceIds.length === 0) return []
-        const api = new AppsV2025Api(this.config)
+        const api = new AppsV2026Api(this.config)
         const filterValue = sourceIds.map((id) => `"${id}"`).join(',')
         const filters = `accountSource.id in (${filterValue})`
-        const requestParameters: AppsV2025ApiListAllSourceAppRequest = {
+        const requestParameters: AppsV2026ApiListAllSourceAppRequest = {
             filters,
             xSailPointExperimental: 'true',
         }
         const response = await Paginator.paginate(api, api.listAllSourceApp as any, requestParameters)
-        return response.data as SourceAppV2025[]
+        return response.data as SourceAppV2026[]
     }
 
     /**
      * List roles filtered by owner IDs.
      */
-    async listRolesByOwners(ownerIds: string[]): Promise<RoleV2025[]> {
+    async listRolesByOwners(ownerIds: string[]): Promise<RoleV2026[]> {
         if (ownerIds.length === 0) return []
-        const api = new RolesV2025Api(this.config)
+        const api = new RolesV2026Api(this.config)
         const filterValue = ownerIds.map((id) => `"${id}"`).join(',')
         const filters = `owner.id in (${filterValue})`
-        const requestParameters: RolesV2025ApiListRolesRequest = { filters }
+        const requestParameters: RolesV2026ApiListRolesRequest = { filters }
         const response = await Paginator.paginate(api, api.listRoles as any, requestParameters)
-        return response.data as RoleV2025[]
+        return response.data as RoleV2026[]
     }
 
     async deleteAccessProfile(id: string): Promise<void> {
-        const api = new AccessProfilesV2025Api(this.config)
+        const api = new AccessProfilesV2026Api(this.config)
         await api.deleteAccessProfile({ id })
     }
 
     async deleteRole(id: string): Promise<void> {
-        const api = new RolesV2025Api(this.config)
+        const api = new RolesV2026Api(this.config)
         await api.deleteRole({ id })
     }
 
     async deleteSourceApp(id: string): Promise<void> {
-        const api = new AppsV2025Api(this.config)
+        const api = new AppsV2026Api(this.config)
         await api.deleteSourceApp({ id, xSailPointExperimental: 'true' })
     }
 
@@ -498,17 +497,17 @@ export class ISCClient {
      */
     async searchAccessProfilesByEntitlements(entitlementIds: string[]): Promise<LightweightAccessProfile[]> {
         if (entitlementIds.length === 0) return []
-        const api = new SearchV2025Api(this.config)
+        const api = new SearchV2026Api(this.config)
         const results: LightweightAccessProfile[] = []
         const BATCH_SIZE = 10
         for (let i = 0; i < entitlementIds.length; i += BATCH_SIZE) {
             const batch = entitlementIds.slice(i, i + BATCH_SIZE)
             const query = batch.map((id) => `@entitlements(id:${id})`).join(' OR ')
-            const searchRequest: SearchV2025 = {
+            const searchRequest: SearchV2026 = {
                 indices: ['accessprofiles' as any],
                 query: { query } as any,
             }
-            const response = await api.searchPost({ searchV2025: searchRequest })
+            const response = await api.searchPost({ searchV2026: searchRequest })
             const accessProfiles = response.data as any[]
             
             for (const ap of accessProfiles) {
@@ -543,18 +542,18 @@ export class ISCClient {
      */
     async searchRolesByEntitlements(entitlementIds: string[]): Promise<LightweightRole[]> {
         if (entitlementIds.length === 0) return []
-        const api = new SearchV2025Api(this.config)
+        const api = new SearchV2026Api(this.config)
         const results: LightweightRole[] = []
         const BATCH_SIZE = 10
         for (let i = 0; i < entitlementIds.length; i += BATCH_SIZE) {
             const batch = entitlementIds.slice(i, i + BATCH_SIZE)
             const query = batch.map((id) => `@entitlements(id:${id})`).join(' OR ')
             logger.debug(`Role search query batch ${i / BATCH_SIZE + 1}: ${query}`)
-            const searchRequest: SearchV2025 = {
+            const searchRequest: SearchV2026 = {
                 indices: ['roles' as any],
                 query: { query } as any,
             }
-            const response = await api.searchPost({ searchV2025: searchRequest })
+            const response = await api.searchPost({ searchV2026: searchRequest })
             const roles = response.data as any[]
             logger.debug(`Role search batch ${i / BATCH_SIZE + 1} returned ${roles.length} roles${roles.length > 0 ? ': ' + roles.map((r: any) => r.name).join(', ') : ''}`)
             
@@ -584,7 +583,7 @@ export class ISCClient {
     async searchAccessProfilesByNames(names: string[]): Promise<LightweightAccessProfile[]> {
         if (names.length === 0) return []
         logger.debug(`Fallback: Searching access profiles by name (${names.length} names)`)
-        const api = new AccessProfilesV2025Api(this.config)
+        const api = new AccessProfilesV2026Api(this.config)
         const results: LightweightAccessProfile[] = []
         
         const response = await Paginator.paginate(api, api.listAccessProfiles as any, {})
@@ -622,11 +621,11 @@ export class ISCClient {
     async searchRolesByNames(names: string[]): Promise<LightweightRole[]> {
         if (names.length === 0) return []
         logger.debug(`Fallback: Searching roles by name (${names.length} names)`)
-        const api = new RolesV2025Api(this.config)
+        const api = new RolesV2026Api(this.config)
         const results: LightweightRole[] = []
         
         const response = await Paginator.paginate(api, api.listRoles as any, {})
-        const allRoles = response.data as RoleV2025[]
+        const allRoles = response.data as RoleV2026[]
         
         for (const role of allRoles) {
             if (role.name && names.includes(role.name)) {

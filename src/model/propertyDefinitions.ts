@@ -1,8 +1,8 @@
 import {
-    EntitlementRefV2025,
-    RequestabilityForRoleV2025,
-    RequestabilityV2025,
-    RoleMembershipSelectorV2025,
+    EntitlementRefV2026,
+    RequestabilityForRoleV2026,
+    RequestabilityV2026,
+    RoleMembershipSelectorV2026,
 } from 'sailpoint-api-client'
 
 export interface AccessProfileProperties {
@@ -10,18 +10,18 @@ export interface AccessProfileProperties {
     ownerId: string
     sourceId: string
     appName: string
-    entitlements: EntitlementRefV2025[]
+    entitlements: EntitlementRefV2026[]
     requestable: boolean
-    accessRequestConfig?: RequestabilityV2025
+    accessRequestConfig?: RequestabilityV2026
 }
 
 export interface RoleProperties {
     id?: string
     ownerId: string
-    entitlements: EntitlementRefV2025[]
+    entitlements: EntitlementRefV2026[]
     requestable: boolean
-    accessRequestConfig?: RequestabilityForRoleV2025
-    membership?: RoleMembershipSelectorV2025
+    accessRequestConfig?: RequestabilityForRoleV2026
+    membership?: RoleMembershipSelectorV2026
 }
 
 export interface ApplicationProperties {

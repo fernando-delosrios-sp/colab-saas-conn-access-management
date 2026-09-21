@@ -1,12 +1,12 @@
 import {
-    RoleCriteriaLevel1,
-    Source,
-    RoleMembershipSelectorType,
-    RoleMembershipSelectorV2025,
-    RoleCriteriaKey,
-    RoleCriteriaKeyType,
-    RoleCriteriaLevel2,
-    RoleCriteriaOperation,
+    RoleCriteriaLevel1V2026,
+    SourceV2026,
+    RoleMembershipSelectorTypeV2026,
+    RoleMembershipSelectorV2026,
+    RoleCriteriaKeyV2026,
+    RoleCriteriaKeyTypeV2026,
+    RoleCriteriaLevel2V2026,
+    RoleCriteriaOperationV2026,
 } from 'sailpoint-api-client'
 
 // String Iterator
@@ -98,7 +98,7 @@ interface Visitor<T> {
 class Attribute implements Expression {
     sourceName?: string
     property?: string
-    type?: RoleCriteriaKeyType
+    type?: RoleCriteriaKeyTypeV2026
 
     public static fromIdentityAttribute(identityAttribute: string): Attribute {
         const attr = new Attribute()
@@ -107,7 +107,7 @@ class Attribute implements Expression {
         return attr
     }
 
-    public static fromSourceBased(sourceName: string, type: RoleCriteriaKeyType, property: string): Attribute {
+    public static fromSourceBased(sourceName: string, type: RoleCriteriaKeyTypeV2026, property: string): Attribute {
         const attr = new Attribute()
         attr.type = type
         attr.property = property
@@ -198,11 +198,11 @@ class Parser {
         this.checkDot(stringIterator)
 
         const what = stringIterator.readToken()
-        let type: RoleCriteriaKeyType
+        let type: RoleCriteriaKeyTypeV2026
         if ('attribute' === what?.toLowerCase()) {
-            type = RoleCriteriaKeyType.Account
+            type = RoleCriteriaKeyTypeV2026.Account
         } else if ('entitlement' === what?.toLowerCase()) {
-            type = RoleCriteriaKeyType.Entitlement
+            type = RoleCriteriaKeyTypeV2026.Entitlement
         } else {
             throw new Error('Was expecting either attribute or entitlement')
         }
@@ -248,7 +248,7 @@ class Parser {
 }
 
 // Converter
-function comparisonOperationMapper(op: ComparisonOperation): RoleCriteriaOperation {
+function comparisonOperationMapper(op: ComparisonOperation): RoleCriteriaOperationV2026 {
     switch (op) {
         case 'eq':
             return 'EQUALS'
@@ -265,58 +265,58 @@ function comparisonOperationMapper(op: ComparisonOperation): RoleCriteriaOperati
     }
 }
 
-class RoleMembershipSelectorConverter implements Visitor<RoleCriteriaLevel1> {
-    root: RoleCriteriaLevel1 | undefined = undefined
-    private readonly sourceMap: Map<string, Source>
+class RoleMembershipSelectorConverter implements Visitor<RoleCriteriaLevel1V2026> {
+    root: RoleCriteriaLevel1V2026 | undefined = undefined
+    private readonly sourceMap: Map<string, SourceV2026>
 
-    constructor(private readonly sources: Source[]) {
+    constructor(private readonly sources: SourceV2026[]) {
         this.sourceMap = new Map()
         for (const s of sources) {
             this.sourceMap.set(s.name, s)
         }
     }
 
-    async visitExpression(val: Expression, arg: RoleCriteriaLevel1): Promise<void> {
+    async visitExpression(val: Expression, arg: RoleCriteriaLevel1V2026): Promise<void> {
         await val.accept(this, arg)
 
         if (this.root?.children === undefined || this.root?.children?.length === 0) {
             this.root = {
                 operation: 'OR',
-                children: [this.root as RoleCriteriaLevel2],
+                children: [this.root as RoleCriteriaLevel2V2026],
             }
         } else if (this.root.children?.every((x) => x.children === undefined || x.children?.length === 0)) {
             this.root = {
                 operation: this.root.operation === 'AND' ? 'OR' : 'AND',
-                children: [this.root as RoleCriteriaLevel2],
+                children: [this.root as RoleCriteriaLevel2V2026],
             }
         }
     }
 
-    async visitAttribute(val: Attribute, arg: RoleCriteriaLevel1): Promise<void> {
+    async visitAttribute(val: Attribute, arg: RoleCriteriaLevel1V2026): Promise<void> {
         const keyType = val.type
         let property = `attribute.${val.property}`
         let sourceId: string | undefined
-        if (keyType !== RoleCriteriaKeyType.Identity) {
+        if (keyType !== RoleCriteriaKeyTypeV2026.Identity) {
             const source = val.sourceName ? this.sourceMap.get(val.sourceName) : undefined
             if (source) {
                 sourceId = source.id
             }
         }
 
-        const key: RoleCriteriaKey = {
-            type: keyType as RoleCriteriaKeyType,
+        const key: RoleCriteriaKeyV2026 = {
+            type: keyType as RoleCriteriaKeyTypeV2026,
             property,
             sourceId,
         }
         arg.key = key
     }
 
-    visitLiteral(val: Literal, arg: RoleCriteriaLevel1): void | Promise<void> {
+    visitLiteral(val: Literal, arg: RoleCriteriaLevel1V2026): void | Promise<void> {
         arg.stringValue = val.value
     }
 
-    async visitComparisonOperator(val: ComparisonOperator, arg: RoleCriteriaLevel1): Promise<void> {
-        const roleCriteriaValue: RoleCriteriaLevel1 = {
+    async visitComparisonOperator(val: ComparisonOperator, arg: RoleCriteriaLevel1V2026): Promise<void> {
+        const roleCriteriaValue: RoleCriteriaLevel1V2026 = {
             operation: comparisonOperationMapper(val.operation),
         }
 
@@ -324,14 +324,14 @@ class RoleMembershipSelectorConverter implements Visitor<RoleCriteriaLevel1> {
         await val.attribute.accept(this, roleCriteriaValue)
 
         if (arg !== undefined) {
-            arg.children?.push(roleCriteriaValue as RoleCriteriaLevel2)
+            arg.children?.push(roleCriteriaValue as RoleCriteriaLevel2V2026)
         } else {
             this.root = roleCriteriaValue
         }
     }
 
-    async visitLogicalOperator(val: LogicalOperator, arg: RoleCriteriaLevel1): Promise<void> {
-        const roleCriteriaValue: RoleCriteriaLevel1 = {
+    async visitLogicalOperator(val: LogicalOperator, arg: RoleCriteriaLevel1V2026): Promise<void> {
+        const roleCriteriaValue: RoleCriteriaLevel1V2026 = {
             operation: val.operation,
             children: [],
         }
@@ -340,7 +340,7 @@ class RoleMembershipSelectorConverter implements Visitor<RoleCriteriaLevel1> {
         }
 
         if (arg !== undefined) {
-            arg.children?.push(roleCriteriaValue as RoleCriteriaLevel2)
+            arg.children?.push(roleCriteriaValue as RoleCriteriaLevel2V2026)
         } else {
             this.root = roleCriteriaValue
         }
@@ -348,14 +348,14 @@ class RoleMembershipSelectorConverter implements Visitor<RoleCriteriaLevel1> {
 }
 
 // Main function
-export const stringToMembership = async (str: string, sources: Source[]): Promise<RoleMembershipSelectorV2025> => {
+export const stringToMembership = async (str: string, sources: SourceV2026[]): Promise<RoleMembershipSelectorV2026> => {
     const parser = new Parser()
     const expression = parser.parse(str)
     const converter = new RoleMembershipSelectorConverter(sources)
-    await converter.visitExpression(expression, undefined as unknown as RoleCriteriaLevel1)
+    await converter.visitExpression(expression, undefined as unknown as RoleCriteriaLevel1V2026)
 
-    const membership: RoleMembershipSelectorV2025 = {
-        type: RoleMembershipSelectorType.Standard,
+    const membership: RoleMembershipSelectorV2026 = {
+        type: RoleMembershipSelectorTypeV2026.Standard,
         criteria: converter.root,
     }
 

@@ -1,8 +1,8 @@
-import { EntitlementRefV2025, EntitlementV2025 } from 'sailpoint-api-client'
+import { EntitlementRefV2026, EntitlementV2026 } from 'sailpoint-api-client'
 import { stringToMembership } from './membership-parser'
 import { buildEntitlementVelocityContext, evaluateVelocityExpression } from './velocity'
 
-export const entitlementToRef = (entitlement: EntitlementV2025): EntitlementRefV2025 => {
+export const entitlementToRef = (entitlement: EntitlementV2026): EntitlementRefV2026 => {
     if (!entitlement.id) {
         throw new Error(`Entitlement is missing ID: ${JSON.stringify(entitlement)}`)
     }

@@ -1,8 +1,8 @@
 import {
-    EntitlementApprovalSchemeV2025ApproverTypeV2025,
-    EntitlementRequestConfigV2025,
-    EntitlementV2025,
-    JsonPatchOperationV2025,
+    EntitlementApprovalSchemeV2026ApproverTypeV2026,
+    EntitlementRequestConfigV2026,
+    EntitlementV2026,
+    JsonPatchOperationV2026,
 } from 'sailpoint-api-client'
 import { areEntitlementRefsEqual, areJsonEqual } from './comparison'
 
@@ -10,7 +10,7 @@ import { areEntitlementRefsEqual, areJsonEqual } from './comparison'
  * Adds an entitlement to a group map, creating the group array if it doesn't exist.
  * Used when grouping entitlements by expression result (role name, access profile name, etc.).
  */
-export function pushToGroupMap<K>(map: Map<K, EntitlementV2025[]>, key: K, entitlement: EntitlementV2025): void {
+export function pushToGroupMap<K>(map: Map<K, EntitlementV2026[]>, key: K, entitlement: EntitlementV2026): void {
     if (!map.has(key)) {
         map.set(key, [])
     }
@@ -27,10 +27,10 @@ export function buildApprovalSchemesConfig(approverType: string): { approvalSche
 /**
  * Builds entitlement request config for PUT /entitlements/:id/entitlement-request-config.
  */
-export function buildEntitlementRequestConfig(approverType: string): EntitlementRequestConfigV2025 {
+export function buildEntitlementRequestConfig(approverType: string): EntitlementRequestConfigV2026 {
     return {
         accessRequestConfig: {
-            approvalSchemes: [{ approverType: approverType as EntitlementApprovalSchemeV2025ApproverTypeV2025 }],
+            approvalSchemes: [{ approverType: approverType as EntitlementApprovalSchemeV2026ApproverTypeV2026 }],
         },
     }
 }
@@ -48,8 +48,8 @@ export interface EntitlementPatchOptions {
 export function buildEntitlementPatch(
     entitlements: { id?: string | null }[],
     options?: EntitlementPatchOptions
-): JsonPatchOperationV2025[] {
-    const patch: JsonPatchOperationV2025[] = []
+): JsonPatchOperationV2026[] {
+    const patch: JsonPatchOperationV2026[] = []
 
     const changes = options?.changes
 
@@ -58,33 +58,33 @@ export function buildEntitlementPatch(
         patch.push({
             op: 'replace',
             path: '/entitlements',
-            value: entitlements as JsonPatchOperationV2025['value'],
+            value: entitlements as JsonPatchOperationV2026['value'],
         })
     }
     if (!changes || changes.enabledChanged) {
         patch.push({
             op: 'replace',
             path: '/enabled',
-            value: true as JsonPatchOperationV2025['value'],
+            value: true as JsonPatchOperationV2026['value'],
         })
     }
 
     if (options?.requestable !== undefined && (!changes || changes.requestableChanged)) {
         const isRequestable = options.requestable === true || String(options.requestable) === 'true'
-        patch.push({ op: 'replace', path: '/requestable', value: isRequestable as JsonPatchOperationV2025['value'] })
+        patch.push({ op: 'replace', path: '/requestable', value: isRequestable as JsonPatchOperationV2026['value'] })
     }
     if (options?.accessRequestConfig && (!changes || changes.accessRequestConfigChanged)) {
         patch.push({
             op: 'replace',
             path: '/accessRequestConfig',
-            value: options.accessRequestConfig as JsonPatchOperationV2025['value'],
+            value: options.accessRequestConfig as JsonPatchOperationV2026['value'],
         })
     }
     if (options?.membership !== undefined && options.membership !== null && (!changes || changes.membershipChanged)) {
         patch.push({
             op: 'replace',
             path: '/membership',
-            value: options.membership as JsonPatchOperationV2025['value'],
+            value: options.membership as JsonPatchOperationV2026['value'],
         })
     }
     return patch

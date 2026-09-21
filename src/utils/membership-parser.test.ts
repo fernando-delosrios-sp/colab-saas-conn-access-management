@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert'
 import { stringToMembership } from './membership-parser'
-import { Source, RoleCriteriaKeyType, RoleMembershipSelectorType } from 'sailpoint-api-client'
+import { SourceV2026, RoleCriteriaKeyTypeV2026, RoleMembershipSelectorTypeV2026 } from 'sailpoint-api-client'
 
 const mockSources = [
     {
@@ -35,20 +35,20 @@ const mockSources = [
         created: '',
         modified: '',
     },
-] as unknown as Source[]
+] as unknown as SourceV2026[]
 
 test('stringToMembership - Identity criteria parsing', async (t) => {
     const result = await stringToMembership('Identity.department eq "Engineering"', mockSources)
 
     assert.deepStrictEqual(result, {
-        type: RoleMembershipSelectorType.Standard,
+        type: RoleMembershipSelectorTypeV2026.Standard,
         criteria: {
             operation: 'OR',
             children: [
                 {
                     operation: 'EQUALS',
                     key: {
-                        type: RoleCriteriaKeyType.Identity,
+                        type: RoleCriteriaKeyTypeV2026.Identity,
                         property: 'attribute.department',
                         sourceId: undefined,
                     },
@@ -59,18 +59,18 @@ test('stringToMembership - Identity criteria parsing', async (t) => {
     })
 })
 
-test('stringToMembership - Source-based attribute parsing', async (t) => {
+test('stringToMembership - SourceV2026-based attribute parsing', async (t) => {
     const result = await stringToMembership('ActiveDirectory.Attribute.department eq "IT"', mockSources)
 
     assert.deepStrictEqual(result, {
-        type: RoleMembershipSelectorType.Standard,
+        type: RoleMembershipSelectorTypeV2026.Standard,
         criteria: {
             operation: 'OR',
             children: [
                 {
                     operation: 'EQUALS',
                     key: {
-                        type: RoleCriteriaKeyType.Account,
+                        type: RoleCriteriaKeyTypeV2026.Account,
                         property: 'attribute.department',
                         sourceId: 'source1',
                     },
@@ -88,7 +88,7 @@ test('stringToMembership - Multiple operations AND', async (t) => {
     )
 
     assert.deepStrictEqual(result, {
-        type: RoleMembershipSelectorType.Standard,
+        type: RoleMembershipSelectorTypeV2026.Standard,
         criteria: {
             operation: 'OR',
             children: [
@@ -98,7 +98,7 @@ test('stringToMembership - Multiple operations AND', async (t) => {
                         {
                             operation: 'EQUALS',
                             key: {
-                                type: RoleCriteriaKeyType.Identity,
+                                type: RoleCriteriaKeyTypeV2026.Identity,
                                 property: 'attribute.department',
                                 sourceId: undefined,
                             },
@@ -107,7 +107,7 @@ test('stringToMembership - Multiple operations AND', async (t) => {
                         {
                             operation: 'EQUALS',
                             key: {
-                                type: RoleCriteriaKeyType.Account,
+                                type: RoleCriteriaKeyTypeV2026.Account,
                                 property: 'attribute.department',
                                 sourceId: 'source1',
                             },
@@ -127,7 +127,7 @@ test('stringToMembership - Multiple operations OR', async (t) => {
     )
 
     assert.deepStrictEqual(result, {
-        type: RoleMembershipSelectorType.Standard,
+        type: RoleMembershipSelectorTypeV2026.Standard,
         criteria: {
             operation: 'AND',
             children: [
@@ -137,7 +137,7 @@ test('stringToMembership - Multiple operations OR', async (t) => {
                         {
                             operation: 'EQUALS',
                             key: {
-                                type: RoleCriteriaKeyType.Identity,
+                                type: RoleCriteriaKeyTypeV2026.Identity,
                                 property: 'attribute.department',
                                 sourceId: undefined,
                             },
@@ -146,7 +146,7 @@ test('stringToMembership - Multiple operations OR', async (t) => {
                         {
                             operation: 'EQUALS',
                             key: {
-                                type: RoleCriteriaKeyType.Account,
+                                type: RoleCriteriaKeyTypeV2026.Account,
                                 property: 'attribute.department',
                                 sourceId: 'source1',
                             },
@@ -166,7 +166,7 @@ test('stringToMembership - Nested expressions', async (t) => {
     )
 
     assert.deepStrictEqual(result, {
-        type: RoleMembershipSelectorType.Standard,
+        type: RoleMembershipSelectorTypeV2026.Standard,
         criteria: {
             operation: 'AND',
             children: [
@@ -176,7 +176,7 @@ test('stringToMembership - Nested expressions', async (t) => {
                         {
                             operation: 'EQUALS',
                             key: {
-                                type: RoleCriteriaKeyType.Identity,
+                                type: RoleCriteriaKeyTypeV2026.Identity,
                                 property: 'attribute.department',
                                 sourceId: undefined,
                             },
@@ -185,7 +185,7 @@ test('stringToMembership - Nested expressions', async (t) => {
                         {
                             operation: 'EQUALS',
                             key: {
-                                type: RoleCriteriaKeyType.Identity,
+                                type: RoleCriteriaKeyTypeV2026.Identity,
                                 property: 'attribute.department',
                                 sourceId: undefined,
                             },
@@ -196,7 +196,7 @@ test('stringToMembership - Nested expressions', async (t) => {
                 {
                     operation: 'EQUALS',
                     key: {
-                        type: RoleCriteriaKeyType.Account,
+                        type: RoleCriteriaKeyTypeV2026.Account,
                         property: 'attribute.department',
                         sourceId: 'source1',
                     },
@@ -242,14 +242,14 @@ test('stringToMembership - Other comparison operations', async (t) => {
     for (const { op, expected } of ops) {
         const result = await stringToMembership(`Identity.department ${op} "Engineering"`, mockSources)
         assert.deepStrictEqual(result, {
-            type: RoleMembershipSelectorType.Standard,
+            type: RoleMembershipSelectorTypeV2026.Standard,
             criteria: {
                 operation: 'OR',
                 children: [
                     {
                         operation: expected,
                         key: {
-                            type: RoleCriteriaKeyType.Identity,
+                            type: RoleCriteriaKeyTypeV2026.Identity,
                             property: 'attribute.department',
                             sourceId: undefined,
                         },
@@ -264,14 +264,14 @@ test('stringToMembership - Other comparison operations', async (t) => {
 test('stringToMembership - Literal without quotes (accepted by parser)', async (t) => {
     const result = await stringToMembership('Identity.department eq Engineering', mockSources)
     assert.deepStrictEqual(result, {
-        type: RoleMembershipSelectorType.Standard,
+        type: RoleMembershipSelectorTypeV2026.Standard,
         criteria: {
             operation: 'OR',
             children: [
                 {
                     operation: 'EQUALS',
                     key: {
-                        type: RoleCriteriaKeyType.Identity,
+                        type: RoleCriteriaKeyTypeV2026.Identity,
                         property: 'attribute.department',
                         sourceId: undefined,
                     },
@@ -282,18 +282,18 @@ test('stringToMembership - Literal without quotes (accepted by parser)', async (
     })
 })
 
-test('stringToMembership - Source-based entitlement parsing', async (t) => {
+test('stringToMembership - SourceV2026-based entitlement parsing', async (t) => {
     const result = await stringToMembership('ActiveDirectory.Entitlement.memberOf eq "Admin"', mockSources)
 
     assert.deepStrictEqual(result, {
-        type: RoleMembershipSelectorType.Standard,
+        type: RoleMembershipSelectorTypeV2026.Standard,
         criteria: {
             operation: 'OR',
             children: [
                 {
                     operation: 'EQUALS',
                     key: {
-                        type: RoleCriteriaKeyType.Entitlement,
+                        type: RoleCriteriaKeyTypeV2026.Entitlement,
                         property: 'attribute.memberOf',
                         sourceId: 'source1',
                     },

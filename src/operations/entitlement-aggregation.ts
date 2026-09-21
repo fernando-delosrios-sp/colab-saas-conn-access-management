@@ -1,5 +1,5 @@
 import { logger } from '@sailpoint/connector-sdk'
-import { EntitlementV2025, JsonPatchOperationV2025 } from 'sailpoint-api-client'
+import { EntitlementV2026, JsonPatchOperationV2026 } from 'sailpoint-api-client'
 import { ISCClient } from '../isc-client'
 import { Config } from '../model/config'
 import {
@@ -36,9 +36,9 @@ function chunk<T>(arr: T[], size: number): T[][] {
  * 2. Bulk-update requestable/privileged (chunks of 50; API limit).
  * 3. If requireApproval + approverType: set entitlement request config per entitlement.
  *
- * - [Bulk update](https://developer.sailpoint.com/docs/api/v2025/update-entitlements-in-bulk):
+ * - [Bulk update](https://developer.sailpoint.com/docs/api/v2026/update-entitlements-in-bulk):
  *   requestable, privileged (max 50 items per request).
- * - [Put entitlement request config](https://developer.sailpoint.com/docs/api/v2025/put-entitlement-request-config):
+ * - [Put entitlement request config](https://developer.sailpoint.com/docs/api/v2026/put-entitlement-request-config):
  *   approval schemes per entitlement.
  */
 export async function aggregateEntitlements(config: Config, isc: ISCClient): Promise<void> {
@@ -53,7 +53,7 @@ export async function aggregateEntitlements(config: Config, isc: ISCClient): Pro
         logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
 
         // Filter: keep only entitlements where entitlementExpression evaluates to non-empty
-        const selected: EntitlementV2025[] = []
+        const selected: EntitlementV2026[] = []
         for (const entitlement of entitlements) {
             const context = buildEntitlementVelocityContext(entitlement, {
                 definitionName: definition.name,
@@ -76,26 +76,26 @@ export async function aggregateEntitlements(config: Config, isc: ISCClient): Pro
         const entitlementIds = selected.map((e) => e.id!).filter(Boolean)
 
         // Build JSON patch for bulk update (requestable, privileged); API allows max 50 per request
-        const jsonPatch: JsonPatchOperationV2025[] = []
+        const jsonPatch: JsonPatchOperationV2026[] = []
         if (definition.requestable) {
             jsonPatch.push({
                 op: 'replace',
                 path: '/requestable',
-                value: true as JsonPatchOperationV2025['value'],
+                value: true as JsonPatchOperationV2026['value'],
             })
         }
         if (definition.privileged === true) {
             jsonPatch.push({
                 op: 'replace',
                 path: '/privileged',
-                value: true as JsonPatchOperationV2025['value'],
+                value: true as JsonPatchOperationV2026['value'],
             })
         }
         if (definition.privileged === false) {
             jsonPatch.push({
                 op: 'replace',
                 path: '/privileged',
-                value: false as JsonPatchOperationV2025['value'],
+                value: false as JsonPatchOperationV2026['value'],
             })
         }
 
@@ -118,7 +118,7 @@ export async function aggregateEntitlements(config: Config, isc: ISCClient): Pro
         // Set entitlement request config (approval) per entitlement when requireApproval and approverType are defined
         if (definition.requestable && definition.requireApproval && definition.approverType) {
             const requestConfig = buildEntitlementRequestConfig(definition.approverType)
-            const withIds = selected.filter((e): e is EntitlementV2025 & { id: string } => Boolean(e.id))
+            const withIds = selected.filter((e): e is EntitlementV2026 & { id: string } => Boolean(e.id))
             await runWithConcurrency(withIds, API_CONCURRENCY, async (entitlement) => {
                 try {
                     logger.debug(`Setting entitlement request config for ${entitlement.name} (${entitlement.id})`)

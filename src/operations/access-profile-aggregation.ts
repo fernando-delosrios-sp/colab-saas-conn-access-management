@@ -1,5 +1,10 @@
 import { logger } from '@sailpoint/connector-sdk'
-import { EntitlementV2025, JsonPatchOperationV2025, RequestabilityV2025, SourceAppV2025 } from 'sailpoint-api-client'
+import {
+    EntitlementV2026,
+    JsonPatchOperationV2026,
+    RequestabilityV2026,
+    SourceAppV2026,
+} from 'sailpoint-api-client'
 import { ISCClient } from '../isc-client'
 import { AccessProfileDefinition, Config } from '../model/config'
 import {
@@ -20,7 +25,7 @@ const API_CONCURRENCY = 8
 
 interface AccessProfileData {
     name: string
-    entitlements: EntitlementV2025[]
+    entitlements: EntitlementV2026[]
     appName: string
     sourceId: string
     ownerId: string
@@ -88,7 +93,7 @@ async function processAccessProfiles(
     logger.info(`Processing ${accessProfiles.length} access profiles`)
 
     // Cache sources (to get owner IDs) - fetch in parallel
-    const sourceCache = new Map<string, SourceAppV2025>()
+    const sourceCache = new Map<string, SourceAppV2026>()
     const uniqueSourceIds = new Set(accessProfiles.map((ap) => ap.sourceId))
 
     const sourceResults = await Promise.allSettled(
@@ -154,7 +159,7 @@ async function processAccessProfiles(
             const ownerId = source.owner.id
 
             const accessRequestConfig = definition.approverType
-                ? (buildApprovalSchemesConfig(definition.approverType) as RequestabilityV2025)
+                ? (buildApprovalSchemesConfig(definition.approverType) as RequestabilityV2026)
                 : undefined
 
             let apId: string | undefined
@@ -289,7 +294,7 @@ async function processApplications(
         // Step 3: Update app with access profile IDs
         logger.info(`Updating app ${appData.name} with ${apIdsForApp.length} access profiles`)
 
-        const appUpdate: JsonPatchOperationV2025[] = [
+        const appUpdate: JsonPatchOperationV2026[] = [
             { op: 'replace', path: '/accessProfiles', value: apIdsForApp },
             { op: 'replace', path: '/enabled', value: true },
             { op: 'replace', path: '/appCenterEnabled', value: true },
@@ -328,7 +333,7 @@ async function deleteAccessProfilesAndApps(isc: ISCClient, definition: AccessPro
     }
 
     // Group entitlements to determine expected access profile names
-    const entitlementGroups = new Map<string, EntitlementV2025[]>()
+    const entitlementGroups = new Map<string, EntitlementV2026[]>()
     for (const entitlement of entitlements) {
         const context = buildEntitlementVelocityContext(entitlement, {
             definitionName: definition.name,
@@ -407,7 +412,7 @@ async function deleteAccessProfilesAndApps(isc: ISCClient, definition: AccessPro
     // Step 3: Get access profiles for each application
     logger.debug('Fetching access profiles for each application')
 
-    type AppWithAccessProfiles = SourceAppV2025 & { accessProfileIds: string[] }
+    type AppWithAccessProfiles = SourceAppV2026 & { accessProfileIds: string[] }
 
     const appsWithAccessProfiles = await runWithConcurrency(
         existingApps,
@@ -518,7 +523,7 @@ async function buildAccessProfilesFromEntitlements(
     }
 
     // Group entitlements by access profile name (from entitlementExpression)
-    const groups = new Map<string, EntitlementV2025[]>()
+    const groups = new Map<string, EntitlementV2026[]>()
 
     for (const entitlement of entitlements) {
         if (!entitlement.source?.id) {

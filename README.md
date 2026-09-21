@@ -250,7 +250,7 @@ npm run pack-zip
 
 ### Entitlement Management
 
--   Query-based entitlement selection using List Entitlements API (`/v2025/entitlements`) filters
+-   Query-based entitlement selection using List Entitlements API (`/v2026/entitlements`) filters
 -   Velocity expression filtering for fine-grained control
 -   Bulk update of requestable and privileged flags (50 entitlements per API call)
 -   Per-entitlement approval workflow configuration
@@ -293,7 +293,7 @@ npm run pack-zip
 -   Source-aware operations (owner resolution, validation)
 -   Controlled concurrency (8 concurrent API operations)
 -   Smart update detection to avoid unnecessary API calls
--   Integration with ISC V2025 APIs
+-   Integration with ISC V2026 APIs
 -   Debug logging support
 
 ## Velocity Template Variables
@@ -498,28 +498,25 @@ access-management/
 
 ## API Endpoints Used
 
-### V3 APIs (via sailpoint-api-client)
+### V2026 APIs (via sailpoint-api-client)
 
--   `GET /v3/entitlements` - List entitlements with filters
--   `GET /v3/sources` - List sources
--   `GET /v3/access-profiles` - List access profiles
--   `POST /v3/access-profiles` - Create access profiles
--   `PATCH /v3/access-profiles/{id}` - Update access profiles
--   `DELETE /v3/access-profiles/{id}` - Delete access profiles
--   `GET /v3/roles` - List roles
--   `POST /v3/roles` - Create roles
--   `PATCH /v3/roles/{id}` - Update roles
--   `DELETE /v3/roles/{id}` - Delete roles
--   `POST /v3/search` - Search for roles by entitlements
-
-### V2025 APIs (via sailpoint-api-client)
-
--   `PATCH /v2025/entitlements` - Bulk update entitlements (max 50 per request)
--   `PUT /v2025/entitlement-request-config/{id}` - Set entitlement request config
--   `GET /v2025/applications` - List applications
--   `POST /v2025/applications` - Create applications
--   `PATCH /v2025/applications/{id}` - Update applications
--   `DELETE /v2025/applications/{id}` - Delete applications
+-   `GET /v2026/entitlements` - List entitlements with filters
+-   `PATCH /v2026/entitlements` - Bulk update entitlements (max 50 per request)
+-   `PUT /v2026/entitlement-request-config/{id}` - Set entitlement request config
+-   `GET /v2026/sources` - List sources
+-   `GET /v2026/access-profiles` - List access profiles
+-   `POST /v2026/access-profiles` - Create access profiles
+-   `PATCH /v2026/access-profiles/{id}` - Update access profiles
+-   `DELETE /v2026/access-profiles/{id}` - Delete access profiles
+-   `GET /v2026/roles` - List roles
+-   `POST /v2026/roles` - Create roles
+-   `PATCH /v2026/roles/{id}` - Update roles
+-   `DELETE /v2026/roles/{id}` - Delete roles
+-   `POST /v2026/search` - Search for roles by entitlements
+-   `GET /v2026/applications` - List applications
+-   `POST /v2026/applications` - Create applications
+-   `PATCH /v2026/applications/{id}` - Update applications
+-   `DELETE /v2026/applications/{id}` - Delete applications
 
 ## Performance Considerations
 

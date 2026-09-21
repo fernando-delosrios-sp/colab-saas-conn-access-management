@@ -1,14 +1,13 @@
 import { ISCClient } from './isc-client'
 import {
     Configuration,
-    PublicIdentitiesConfigApi,
+    PublicIdentitiesConfigV2026Api,
     Paginator,
-    SourcesApi,
-    EntitlementsV2025Api,
-    AccessProfilesV2025Api,
-    RolesV2025Api,
-    AppsV2025Api,
-    SourcesV2025Api,
+    EntitlementsV2026Api,
+    AccessProfilesV2026Api,
+    RolesV2026Api,
+    AppsV2026Api,
+    SourcesV2026Api,
 } from 'sailpoint-api-client'
 import { Config } from './model/config'
 import * as utils from './utils/index'
@@ -119,11 +118,11 @@ describe('ISCClient', () => {
             const mockApi = {
                 getPublicIdentityConfig: jest.fn().mockResolvedValue({ data: { test: true } }),
             }
-            ;(PublicIdentitiesConfigApi as jest.Mock).mockImplementation(() => mockApi)
+            ;(PublicIdentitiesConfigV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             const result = await client.getPublicIdentityConfig()
             expect(result).toEqual({ test: true })
-            expect(PublicIdentitiesConfigApi).toHaveBeenCalled()
+            expect(PublicIdentitiesConfigV2026Api).toHaveBeenCalled()
             expect(mockApi.getPublicIdentityConfig).toHaveBeenCalled()
         })
     })
@@ -133,7 +132,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 listSources: jest.fn(),
             }
-            ;(SourcesApi as jest.Mock).mockImplementation(() => mockApi)
+            ;(SourcesV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             jest.spyOn(Paginator, 'paginate').mockResolvedValue({ data: [{ id: 'source-1' }] } as any)
 
@@ -148,7 +147,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 listEntitlements: jest.fn(),
             }
-            ;(EntitlementsV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(EntitlementsV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             jest.spyOn(Paginator, 'paginate').mockResolvedValue({ data: [{ id: 'ent-1' }] } as any)
 
@@ -164,7 +163,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 listAccessProfiles: jest.fn().mockResolvedValue({ data: [{ id: 'ap-1' }] }),
             }
-            ;(AccessProfilesV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(AccessProfilesV2026Api as jest.Mock).mockImplementation(() => mockApi)
             jest.spyOn(utils, 'escapeFilterString').mockReturnValue('escaped-name')
 
             const result = await client.getAccessProfileByName('test-name')
@@ -177,7 +176,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 listAccessProfiles: jest.fn().mockResolvedValue({ data: [] }),
             }
-            ;(AccessProfilesV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(AccessProfilesV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             const result = await client.getAccessProfileByName('test-name')
             expect(result).toBeUndefined()
@@ -189,7 +188,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 listRoles: jest.fn().mockResolvedValue({ data: [{ id: 'role-1' }] }),
             }
-            ;(RolesV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(RolesV2026Api as jest.Mock).mockImplementation(() => mockApi)
             jest.spyOn(utils, 'escapeFilterString').mockReturnValue('escaped-role-name')
 
             const result = await client.getRoleByName('test-role')
@@ -203,7 +202,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 listAllSourceApp: jest.fn().mockResolvedValue({ data: [{ id: 'app-1' }] }),
             }
-            ;(AppsV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(AppsV2026Api as jest.Mock).mockImplementation(() => mockApi)
             jest.spyOn(utils, 'escapeFilterString').mockReturnValue('escaped-app-name')
 
             const result = await client.getAppByName('test-app')
@@ -217,13 +216,13 @@ describe('ISCClient', () => {
             const mockApi = {
                 createSourceApp: jest.fn().mockResolvedValue({ data: { id: 'new-app' } }),
             }
-            ;(AppsV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(AppsV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             const result = await client.createApp('App Name', 'source-id')
             expect(result).toEqual({ id: 'new-app' })
             expect(mockApi.createSourceApp).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    sourceAppCreateDtoV2025: {
+                    sourceAppCreateDtoV2026: {
                         name: 'App Name',
                         description: 'App Name',
                         accountSource: { id: 'source-id' },
@@ -239,14 +238,14 @@ describe('ISCClient', () => {
             const mockApi = {
                 patchSourceApp: jest.fn().mockResolvedValue({ data: { id: 'patched-app' } }),
             }
-            ;(AppsV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(AppsV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             const patch = [{ op: 'add', path: '/test', value: 'val' }] as any
             const result = await client.updateSourceAccessProfiles('app-id', patch)
             expect(result).toEqual({ id: 'patched-app' })
             expect(mockApi.patchSourceApp).toHaveBeenCalledWith({
                 id: 'app-id',
-                jsonPatchOperationV2025: patch,
+                jsonPatchOperationV2026: patch,
                 xSailPointExperimental: 'true',
             })
         })
@@ -257,7 +256,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 getSource: jest.fn().mockResolvedValue({ data: { id: 'source-1' } }),
             }
-            ;(SourcesV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(SourcesV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             const result = await client.getSource('source-1')
             expect(result).toEqual({ id: 'source-1' })
@@ -270,7 +269,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 createAccessProfile: jest.fn().mockResolvedValue({ data: { id: 'new-ap' } }),
             }
-            ;(AccessProfilesV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(AccessProfilesV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             const entitlements = [{ type: 'ENTITLEMENT', id: 'ent-1' }] as any
             const result = await client.createAccessProfile('AP Name', 'owner-1', 'source-1', entitlements)
@@ -278,7 +277,7 @@ describe('ISCClient', () => {
             expect(result).toEqual({ id: 'new-ap' })
             expect(mockApi.createAccessProfile).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    accessProfileV2025: expect.objectContaining({
+                    accessProfileV2026: expect.objectContaining({
                         name: 'AP Name',
                         owner: { id: 'owner-1', type: 'IDENTITY' },
                         source: { id: 'source-1', type: 'SOURCE' },
@@ -292,7 +291,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 createAccessProfile: jest.fn().mockResolvedValue({ data: { id: 'new-ap' } }),
             }
-            ;(AccessProfilesV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(AccessProfilesV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             const entitlements = [{ type: 'ENTITLEMENT', id: 'ent-1' }] as any
             const accessRequestConfig = { approvalSchemes: [] } as any
@@ -308,7 +307,7 @@ describe('ISCClient', () => {
             expect(result).toEqual({ id: 'new-ap' })
             expect(mockApi.createAccessProfile).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    accessProfileV2025: expect.objectContaining({
+                    accessProfileV2026: expect.objectContaining({
                         name: 'AP Name',
                         owner: { id: 'owner-1', type: 'IDENTITY' },
                         source: { id: 'source-1', type: 'SOURCE' },
@@ -326,7 +325,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 patchAccessProfile: jest.fn().mockResolvedValue({ data: { id: 'patched-ap' } }),
             }
-            ;(AccessProfilesV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(AccessProfilesV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             const patch = [{ op: 'replace', path: '/description', value: 'new' }] as any
             const result = await client.updateAccessProfile('ap-id', patch)
@@ -334,7 +333,7 @@ describe('ISCClient', () => {
             expect(result).toEqual({ id: 'patched-ap' })
             expect(mockApi.patchAccessProfile).toHaveBeenCalledWith({
                 id: 'ap-id',
-                jsonPatchOperationV2025: patch,
+                jsonPatchOperationV2026: patch,
             })
         })
     })
@@ -344,7 +343,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 createRole: jest.fn().mockResolvedValue({ data: { id: 'new-role' } }),
             }
-            ;(RolesV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(RolesV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             const entitlements = [{ type: 'ENTITLEMENT', id: 'ent-1' }] as any
             const result = await client.createRole('Role Name', 'owner-1', entitlements)
@@ -352,7 +351,7 @@ describe('ISCClient', () => {
             expect(result).toEqual({ id: 'new-role' })
             expect(mockApi.createRole).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    roleV2025: expect.objectContaining({
+                    roleV2026: expect.objectContaining({
                         name: 'Role Name',
                         owner: { id: 'owner-1', type: 'IDENTITY' },
                         entitlements,
@@ -365,7 +364,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 createRole: jest.fn().mockResolvedValue({ data: { id: 'new-role' } }),
             }
-            ;(RolesV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(RolesV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             const entitlements = [{ type: 'ENTITLEMENT', id: 'ent-1' }] as any
             const accessRequestConfig = { approvalSchemes: [] } as any
@@ -382,7 +381,7 @@ describe('ISCClient', () => {
             expect(result).toEqual({ id: 'new-role' })
             expect(mockApi.createRole).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    roleV2025: expect.objectContaining({
+                    roleV2026: expect.objectContaining({
                         name: 'Role Name',
                         owner: { id: 'owner-1', type: 'IDENTITY' },
                         entitlements,
@@ -400,7 +399,7 @@ describe('ISCClient', () => {
             const mockApi = {
                 patchRole: jest.fn().mockResolvedValue({ data: { id: 'patched-role' } }),
             }
-            ;(RolesV2025Api as jest.Mock).mockImplementation(() => mockApi)
+            ;(RolesV2026Api as jest.Mock).mockImplementation(() => mockApi)
 
             const patch = [{ op: 'replace', path: '/description', value: 'new' }] as any
             const result = await client.updateRole('role-id', patch)
@@ -408,7 +407,7 @@ describe('ISCClient', () => {
             expect(result).toEqual({ id: 'patched-role' })
             expect(mockApi.patchRole).toHaveBeenCalledWith({
                 id: 'role-id',
-                jsonPatchOperationV2025: patch,
+                jsonPatchOperationV2026: patch,
             })
         })
     })
