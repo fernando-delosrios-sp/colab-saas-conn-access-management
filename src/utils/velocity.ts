@@ -1,11 +1,25 @@
 import velocityjs from 'velocityjs'
 
-function isUnsafeVelocityAST(nodes: any): boolean {
+function evaluateStatic(node: any, variables: Record<string, string>): string | undefined {
+    if (!node) return undefined
+    if (node.type === 'string') return node.value
+    if (node.type === 'references' && node.id) return variables[node.id]
+    if (node.type === 'math' && node.operator === '+' && node.expression && node.expression.length === 2) {
+        const left = evaluateStatic(node.expression[0], variables)
+        const right = evaluateStatic(node.expression[1], variables)
+        if (left !== undefined && right !== undefined) {
+            return left + right
+        }
+    }
+    return undefined
+}
+
+function isUnsafeVelocityAST(nodes: any, variables: Record<string, string> = {}): boolean {
     if (!nodes) return false
 
     if (Array.isArray(nodes)) {
         for (const node of nodes) {
-            if (isUnsafeVelocityAST(node)) return true
+            if (isUnsafeVelocityAST(node, variables)) return true
         }
         return false
     }
@@ -16,19 +30,33 @@ function isUnsafeVelocityAST(nodes: any): boolean {
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
+        if (nodes.type === 'set' && nodes.equal && nodes.equal.length === 2) {
+            const target = nodes.equal[0]
+            const expr = nodes.equal[1]
+            if (target && target.type === 'references' && target.id) {
+                const val = evaluateStatic(expr, variables)
+                if (val !== undefined) {
+                    variables[target.id] = val
+                }
+            }
+        }
+
         if (
-            id === 'constructor' ||
-            id === '__proto__' ||
-            id === 'prototype' ||
-            (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
-        )
+            (nodes.type === 'property' || nodes.type === 'method') &&
+            (id === 'constructor' || id === '__proto__' || id === 'prototype')
+        ) {
             return true
+        }
+
+        if (nodes.type === 'index' && id) {
+            const val = evaluateStatic(id, variables)
+            if (val && (val === 'constructor' || val === '__proto__' || val === 'prototype')) {
+                return true
+            }
+        }
 
         for (const key of Object.keys(nodes)) {
-            if (isUnsafeVelocityAST(nodes[key])) return true
+            if (isUnsafeVelocityAST(nodes[key], variables)) return true
         }
     }
 
@@ -46,10 +74,7 @@ const templateCache = new Map<string, any>()
  * @returns Rendered string
  * @throws Error if template parsing or rendering fails
  */
-export function evaluateVelocityExpression(
-    template: string,
-    context: Record<string, unknown> = {}
-): string {
+export function evaluateVelocityExpression(template: string, context: Record<string, unknown> = {}): string {
     let velocity = templateCache.get(template)
     if (!velocity) {
         const velocityTemplate = velocityjs.parse(template)
