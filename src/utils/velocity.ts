@@ -11,42 +11,65 @@ function isUnsafeVelocityAST(nodes: any, env: Record<string, string> = {}): bool
     }
 
     if (typeof nodes === 'object') {
+        const id = nodes.id
+
         // Block macro evaluation logic
-        if (nodes.type === 'macro_call' && nodes.id === 'evaluate') return true
+        if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
         if (nodes.type === 'set' && Array.isArray(nodes.equal) && nodes.equal.length === 2) {
             const ref = nodes.equal[0]
             const expr = nodes.equal[1]
             if (ref.type === 'references' && ref.id) {
                 if (expr.type === 'string') {
-                    env[ref.id] = expr.value
-                } else if (expr.type === 'math' && expr.operator === '+' && Array.isArray(expr.expression)) {
-                    let val = ''
-                    for (const operand of expr.expression) {
-                        if (operand.type === 'string') {
-                            val += operand.value
-                        } else if (operand.type === 'references' && operand.id && env[operand.id]) {
-                            val += env[operand.id]
+                    // String interpolation check
+                    let val = expr.value
+                    const matches = val.match(/\$\{?([a-zA-Z0-9_]+)\}?/g)
+                    if (matches) {
+                        for (const match of matches) {
+                            const varName = match.replace(/[\$\{\}]/g, '')
+                            if (env[varName]) {
+                                val = val.replace(match, env[varName])
+                            }
                         }
+                    }
+                    env[ref.id] = val
+                } else if (expr.type === 'math' && expr.operator === '+') {
+                    let val = ''
+                    const processOperand = (op: any) => {
+                        if (!op) return
+                        if (op.type === 'string') val += op.value
+                        else if (op.type === 'references' && op.id && env[op.id]) val += env[op.id]
+                        else if (op.type === 'math' && op.operator === '+') {
+                            processOperand(op.left || op.expression?.[0])
+                            processOperand(op.right || op.expression?.[1])
+                        }
+                    }
+                    // Handle expression array or left/right operands depending on velocity AST
+                    if (Array.isArray(expr.expression)) {
+                        for (const operand of expr.expression) processOperand(operand)
+                    } else {
+                        processOperand(expr.left)
+                        processOperand(expr.right)
                     }
                     env[ref.id] = val
                 }
             }
         }
 
-        if (nodes.type === 'property' || nodes.type === 'method') {
-            const id = nodes.id
-            if (id === 'constructor' || id === '__proto__' || id === 'prototype') return true
-        }
-
-        if (nodes.type === 'index' && nodes.id) {
-            let val = ''
-            if (nodes.id.type === 'string') {
-                val = nodes.id.value
-            } else if (nodes.id.type === 'references' && nodes.id.id && env[nodes.id.id]) {
-                val = env[nodes.id.id]
-            }
-            if (val === 'constructor' || val === '__proto__' || val === 'prototype') return true
+        if (
+            id === 'constructor' ||
+            id === '__proto__' ||
+            id === 'prototype' ||
+            (nodes.type === 'index' &&
+                id &&
+                ((id.type === 'string' &&
+                    (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype')) ||
+                    (id.type === 'references' &&
+                        id.id &&
+                        env[id.id] &&
+                        (env[id.id] === 'constructor' || env[id.id] === '__proto__' || env[id.id] === 'prototype'))))
+        ) {
+            return true
         }
 
         for (const key of Object.keys(nodes)) {
