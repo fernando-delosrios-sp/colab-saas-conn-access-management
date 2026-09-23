@@ -89,60 +89,61 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
         // Phase 2: For each group in this definition, build role properties
         // In delete mode, we still need to track expected role names, but skip expensive property building
-        groups: for (const groupName of entitlementMap.keys()) {
-            logger.debug(`Processing group: ${groupName}`)
-
-            // In delete mode, just track the name to know which roles to delete
-            if (deleteStaleRoles) {
+        if (deleteStaleRoles) {
+            for (const groupName of entitlementMap.keys()) {
                 logger.debug(`Delete mode: tracking role name for deletion: ${groupName}`)
                 roleMap.set(groupName, {} as RoleProperties)
-                continue groups
             }
+        } else {
+            const accessRequestConfigStr = definition.approverType
+                ? JSON.stringify(buildApprovalSchemesConfig(definition.approverType))
+                : undefined
 
-            // Create/update mode: build full role properties
-            const ownerId = source.owner!.id!
-            const groupEntitlements = entitlementMap.get(groupName)!
+            groups: for (const [groupName, groupEntitlements] of entitlementMap.entries()) {
+                logger.debug(`Processing group: ${groupName}`)
 
-            const roleProperties: RoleProperties = {
-                ownerId,
-                entitlements: groupEntitlements.map(entitlementToRef),
-                requestable: definition.requestable,
-            }
+                // Create/update mode: build full role properties
+                const ownerId = source.owner!.id!
 
-            if (definition.approverType) {
-                roleProperties.accessRequestConfig = buildApprovalSchemesConfig(
-                    definition.approverType
-                ) as RequestabilityForRoleV2026
-            }
-
-            // Evaluate membership assignment definition
-            if (definition.assignmentDefinition) {
-                const assignmentContext: Record<string, unknown> = {
-                    name: groupName,
-                    definitionName: definition.name,
+                const roleProperties: RoleProperties = {
+                    ownerId,
+                    entitlements: groupEntitlements.map(entitlementToRef),
+                    requestable: definition.requestable,
                 }
 
-                if (definition.groupEntitlements) {
-                    // Multiple entitlements grouped: provide all as 'entitlements'
-                    assignmentContext.entitlements = groupEntitlements
-                } else {
-                    // Single entitlement: provide as 'entitlement'
-                    assignmentContext.entitlement = groupEntitlements[0]
+                if (accessRequestConfigStr) {
+                    roleProperties.accessRequestConfig = JSON.parse(accessRequestConfigStr)
                 }
 
-                const assignmentDefinition = evaluateVelocityExpression(
-                    definition.assignmentDefinition,
-                    assignmentContext
-                )
-                roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
-            }
+                // Evaluate membership assignment definition
+                if (definition.assignmentDefinition) {
+                    const assignmentContext: Record<string, unknown> = {
+                        name: groupName,
+                        definitionName: definition.name,
+                    }
 
-            const existingRole = existingRoleMap.get(groupName)
-            if (existingRole) {
-                roleProperties.id = existingRole.id
-            }
+                    if (definition.groupEntitlements) {
+                        // Multiple entitlements grouped: provide all as 'entitlements'
+                        assignmentContext.entitlements = groupEntitlements
+                    } else {
+                        // Single entitlement: provide as 'entitlement'
+                        assignmentContext.entitlement = groupEntitlements[0]
+                    }
 
-            roleMap.set(groupName, roleProperties)
+                    const assignmentDefinition = evaluateVelocityExpression(
+                        definition.assignmentDefinition,
+                        assignmentContext
+                    )
+                    roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
+                }
+
+                const existingRole = existingRoleMap.get(groupName)
+                if (existingRole) {
+                    roleProperties.id = existingRole.id
+                }
+
+                roleMap.set(groupName, roleProperties)
+            }
         }
     }
 
