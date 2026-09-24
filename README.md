@@ -464,8 +464,8 @@ access-management/
 3. Find all existing access profiles in those sources
 4. Find all existing applications in those sources
 5. **Critical step: Remove access profiles from ALL applications that reference them**
-   - Access profiles cannot be deleted if they're still assigned to any application
-   - This includes applications not managed by this definition
+    - Access profiles cannot be deleted if they're still assigned to any application
+    - This includes applications not managed by this definition
 6. Delete applications created by this definition (if `createApplication=true`)
 7. Delete access profiles created by this definition
 8. Only objects matching the naming patterns from this definition are deleted
