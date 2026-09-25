@@ -62,3 +62,6 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+## 2023-10-25 - Optimize loop invariant checks and O(1) map lookups
+**Learning:** In nested loops over Map keys, performing O(1) lookups inside the loop adds unnecessary overhead compared to `Map.entries()`. Moreover, conditional statements evaluating constant loop-invariant properties (like configuration flags) within a loop cause redundant checks on every iteration. However, hoisting conditions that guard labeled control flow (like `continue groups`) requires refactoring the loop into distinct execution paths to avoid label scope errors.
+**Action:** Always prefer `Map.entries()` for full iteration, and refactor loops to hoist invariant condition checks and assignments to the top. When dealing with guarded assignments, split the loop into separate conditional blocks to safely execute them without triggering `TypeError` on invalid states.
