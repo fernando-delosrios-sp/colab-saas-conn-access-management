@@ -40,10 +40,7 @@ function isUnsafeVelocityAST(nodes: any, vars: Record<string, any> = {}): boolea
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
-        if (
-            (nodes.type === 'property' || nodes.type === 'method') &&
-            (id === 'constructor' || id === '__proto__' || id === 'prototype')
-        ) {
+        if (id === 'constructor' || id === '__proto__' || id === 'prototype') {
             return true
         }
 
