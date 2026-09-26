@@ -75,3 +75,14 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** The existing `hasConstructor` validation for Velocity templates in `src/utils/index.ts` only blocked access to the `constructor` and `__proto__` properties. It failed to prevent access to the `prototype` property, and it also allowed executing arbitrary macros like `#evaluate()`. This could allow Sandbox Escapes or Prototype Pollution in `velocityjs` to achieve Server-Side Template Injection (SSTI).
 **Learning:** AST-based validation for template engines must explicitly check for the `prototype` property and execution of macros (like `#evaluate()`) because attackers can use these paths to bypass basic sandbox checks and execute dynamic code.
 **Prevention:** The validation logic in `isUnsafeVelocityAST` must be updated to explicitly check for the `prototype` string inside identifiers and index properties. Furthermore, we must check for nodes of type `macro_call` where the identifier is `evaluate`.
+
+## 2026-09-26 - [Server-Side Template Injection via Velocity Templates String Concatenation Bypass]
+
+**Vulnerability:**
+The existing AST validation for `velocityjs` templates blocked direct identifier access for `constructor`, `__proto__`, and `prototype`, but failed to analyze `#set` directives. Attackers could bypass validation by concatenating dangerous strings in a `#set` directive (e.g., `#set($c = "con" + "structor")`) and dynamically accessing the property using the variable (e.g., `$foo[$c]`). This allows for Server-Side Template Injection (SSTI) and Remote Code Execution (RCE).
+
+**Learning:**
+AST-based validation must be context-aware and track variable assignments within the template. Simple string analysis or direct identifier blocking is insufficient when the template engine supports variable assignment and string operations. Attackers will use these features to construct dangerous strings dynamically.
+
+**Prevention:**
+Enhance the AST validation logic to trace variable assignments in `#set` directives. When a `#set` directive evaluates to a dangerous string (either directly or via simple string concatenation), add the assigned variable to a blocklist (`dangerousVars`). Then, strictly block any dynamic property access (e.g., `index` nodes) that uses variables from this blocklist.
