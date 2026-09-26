@@ -1,10 +1,5 @@
 import { logger } from '@sailpoint/connector-sdk'
-import {
-    EntitlementV2026,
-    JsonPatchOperationV2026,
-    RequestabilityV2026,
-    SourceAppV2026,
-} from 'sailpoint-api-client'
+import { EntitlementV2026, JsonPatchOperationV2026, RequestabilityV2026, SourceAppV2026 } from 'sailpoint-api-client'
 import { ISCClient } from '../isc-client'
 import { AccessProfileDefinition, Config } from '../model/config'
 import {
@@ -140,20 +135,21 @@ async function processAccessProfiles(
 
     // Create/update access profiles in parallel
     const apNameToIdMap = new Map<string, string>()
-    const results = await Promise.allSettled(
-        accessProfiles.map(async (apData) => {
+    // ⚡ Bolt: Use concurrency limiter to avoid API rate limits when processing many access profiles
+    const results = await runWithConcurrency(accessProfiles, API_CONCURRENCY, async (apData) => {
+        try {
             const existingAp = existingApMap.get(apData.name)
             const entitlementRefs = apData.entitlements.map(entitlementToRef)
             const source = sourceCache.get(apData.sourceId)
 
             if (!source) {
                 logger.error(`Source ${apData.sourceId} not found in cache, skipping AP ${apData.name}`)
-                return { name: apData.name, id: undefined }
+                return { status: 'fulfilled' as const, value: { name: apData.name, id: undefined } }
             }
 
             if (!source.owner?.id) {
                 logger.error(`Source ${apData.sourceId} has no owner, skipping AP ${apData.name}`)
-                return { name: apData.name, id: undefined }
+                return { status: 'fulfilled' as const, value: { name: apData.name, id: undefined } }
             }
 
             const ownerId = source.owner.id
@@ -209,9 +205,11 @@ async function processAccessProfiles(
                 }
             }
 
-            return { name: apData.name, id: apId }
-        })
-    )
+            return { status: 'fulfilled' as const, value: { name: apData.name, id: apId } }
+        } catch (error) {
+            return { status: 'rejected' as const, reason: error }
+        }
+    })
 
     // Collect successful results
     for (const result of results) {
