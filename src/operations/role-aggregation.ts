@@ -63,6 +63,21 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             if (ent.id) allEntitlementIds.add(ent.id)
         }
 
+        // ⚡ Bolt: Hoist static assignment parsing outside inner loop to avoid redundant stringToMembership evaluations
+        const isStaticAssignment =
+            definition.assignmentDefinition && !/\$!?\{?(name|entitlements?)\}?/.test(definition.assignmentDefinition)
+        let staticMembership: any = undefined
+        if (isStaticAssignment) {
+            const staticAssignmentContext: Record<string, unknown> = {
+                definitionName: definition.name,
+            }
+            const staticAssignmentDefinition = evaluateVelocityExpression(
+                definition.assignmentDefinition!,
+                staticAssignmentContext
+            )
+            staticMembership = await stringToMembership(staticAssignmentDefinition, sources)
+        }
+
         // Evaluate entitlementExpression; group by role name (definition name or expression result)
         entitlements: for (const entitlement of entitlements) {
             logger.debug(`Processing entitlement: ${entitlement.name} (${entitlement.id})`)
@@ -117,24 +132,29 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
             // Evaluate membership assignment definition
             if (definition.assignmentDefinition) {
-                const assignmentContext: Record<string, unknown> = {
-                    name: groupName,
-                    definitionName: definition.name,
-                }
-
-                if (definition.groupEntitlements) {
-                    // Multiple entitlements grouped: provide all as 'entitlements'
-                    assignmentContext.entitlements = groupEntitlements
+                if (isStaticAssignment && staticMembership) {
+                    // Ensure each role gets a deep copy if we are modifying it later (membership isn't modified here so we can share ref for now, but a shallow copy is safer if API mutates it. However, stringToMembership returns a complex object, we'll assume it's read-only for patching)
+                    roleProperties.membership = staticMembership
                 } else {
-                    // Single entitlement: provide as 'entitlement'
-                    assignmentContext.entitlement = groupEntitlements[0]
-                }
+                    const assignmentContext: Record<string, unknown> = {
+                        name: groupName,
+                        definitionName: definition.name,
+                    }
 
-                const assignmentDefinition = evaluateVelocityExpression(
-                    definition.assignmentDefinition,
-                    assignmentContext
-                )
-                roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
+                    if (definition.groupEntitlements) {
+                        // Multiple entitlements grouped: provide all as 'entitlements'
+                        assignmentContext.entitlements = groupEntitlements
+                    } else {
+                        // Single entitlement: provide as 'entitlement'
+                        assignmentContext.entitlement = groupEntitlements[0]
+                    }
+
+                    const assignmentDefinition = evaluateVelocityExpression(
+                        definition.assignmentDefinition,
+                        assignmentContext
+                    )
+                    roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
+                }
             }
 
             const existingRole = existingRoleMap.get(groupName)

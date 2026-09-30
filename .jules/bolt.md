@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2024-07-28 - Regex for Velocity Variable Detection
+
+**Learning:** When statically analyzing Velocity templates with regex to check for specific variables (e.g., to hoist loop-invariant evaluations), naïve literal matching (like `\$name`) misses formal notation `${name}`, silent reference `$!name`, and plurals.
+**Action:** Use a robust regex like `\$!?\{?(name|entitlements?)\}?` to avoid false positives that bypass static-logic optimizations, which would otherwise lead to applying broken context variables to rendered roles.
