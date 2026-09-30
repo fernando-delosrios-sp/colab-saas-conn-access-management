@@ -1,11 +1,11 @@
 import velocityjs from 'velocityjs'
 
-function isUnsafeVelocityAST(nodes: any): boolean {
+function isUnsafeVelocityAST(nodes: any, unsafeVars: Set<string> = new Set()): boolean {
     if (!nodes) return false
 
     if (Array.isArray(nodes)) {
         for (const node of nodes) {
-            if (isUnsafeVelocityAST(node)) return true
+            if (isUnsafeVelocityAST(node, unsafeVars)) return true
         }
         return false
     }
@@ -16,19 +16,45 @@ function isUnsafeVelocityAST(nodes: any): boolean {
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
+        // Evaluate #set directives to trace dangerous strings
+        if (nodes.type === 'set' && Array.isArray(nodes.equal) && nodes.equal.length === 2) {
+            const [target, expr] = nodes.equal
+            if (target.type === 'references' && target.id) {
+                let evalValue = ''
+                if (expr.type === 'string') {
+                    evalValue = expr.value
+                } else if (expr.type === 'math' && expr.operator === '+' && Array.isArray(expr.expression)) {
+                    // Evaluate string concatenations
+                    evalValue = expr.expression
+                        .map((e: any) => (e.type === 'string' ? e.value : ''))
+                        .join('')
+                }
+
+                if (['constructor', '__proto__', 'prototype'].includes(evalValue)) {
+                    unsafeVars.add(target.id)
+                }
+            }
+        }
+
         if (
             id === 'constructor' ||
             id === '__proto__' ||
-            id === 'prototype' ||
-            (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
-        )
+            id === 'prototype'
+        ) {
             return true
+        }
+
+        if (nodes.type === 'index' && id) {
+            if (id.type === 'string' && ['constructor', '__proto__', 'prototype'].includes(id.value)) {
+                return true
+            }
+            if (id.type === 'references' && id.id && unsafeVars.has(id.id)) {
+                return true
+            }
+        }
 
         for (const key of Object.keys(nodes)) {
-            if (isUnsafeVelocityAST(nodes[key])) return true
+            if (isUnsafeVelocityAST(nodes[key], unsafeVars)) return true
         }
     }
 
