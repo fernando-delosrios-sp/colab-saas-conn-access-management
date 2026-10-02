@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2024-07-25 - Optimize loop-invariant Velocity evaluations
+
+**Learning:** When generating complex properties (like `stringToMembership`) via Velocity templates in a loop, doing it per-iteration creates massive CPU overhead if the template doesn't actually rely on iteration-specific context variables.
+**Action:** Use a regex like `/\$!?\{?(name|entitlements?)\}?/` to statically analyze if the Velocity template string depends on the inner loop context. If it doesn't, evaluate it once before the loop, caching the result to avoid redundant evaluations.
