@@ -87,6 +87,17 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             pushToGroupMap(entitlementMap, roleName, entitlement)
         }
 
+        // ⚡ Bolt: Static analysis to hoist loop-invariant assignment parsing
+        let hoistedMembership: any = undefined
+        const assignmentDef = definition.assignmentDefinition
+        if (assignmentDef && !/\$!?\{?(name|entitlements?)\b\}?/.test(assignmentDef)) {
+            const assignmentContext: Record<string, unknown> = {
+                definitionName: definition.name,
+            }
+            const evalAssignment = evaluateVelocityExpression(assignmentDef, assignmentContext)
+            hoistedMembership = await stringToMembership(evalAssignment, sources)
+        }
+
         // Phase 2: For each group in this definition, build role properties
         // In delete mode, we still need to track expected role names, but skip expensive property building
         groups: for (const groupName of entitlementMap.keys()) {
@@ -117,24 +128,28 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
             // Evaluate membership assignment definition
             if (definition.assignmentDefinition) {
-                const assignmentContext: Record<string, unknown> = {
-                    name: groupName,
-                    definitionName: definition.name,
-                }
-
-                if (definition.groupEntitlements) {
-                    // Multiple entitlements grouped: provide all as 'entitlements'
-                    assignmentContext.entitlements = groupEntitlements
+                if (hoistedMembership !== undefined) {
+                    roleProperties.membership = hoistedMembership
                 } else {
-                    // Single entitlement: provide as 'entitlement'
-                    assignmentContext.entitlement = groupEntitlements[0]
-                }
+                    const assignmentContext: Record<string, unknown> = {
+                        name: groupName,
+                        definitionName: definition.name,
+                    }
 
-                const assignmentDefinition = evaluateVelocityExpression(
-                    definition.assignmentDefinition,
-                    assignmentContext
-                )
-                roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
+                    if (definition.groupEntitlements) {
+                        // Multiple entitlements grouped: provide all as 'entitlements'
+                        assignmentContext.entitlements = groupEntitlements
+                    } else {
+                        // Single entitlement: provide as 'entitlement'
+                        assignmentContext.entitlement = groupEntitlements[0]
+                    }
+
+                    const assignmentDefinition = evaluateVelocityExpression(
+                        definition.assignmentDefinition,
+                        assignmentContext
+                    )
+                    roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
+                }
             }
 
             const existingRole = existingRoleMap.get(groupName)
