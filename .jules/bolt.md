@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2026-07-20 - Optimize Fallback API Queries with Batching and "in" filter
+
+**Learning:** In the SailPoint Connector SDK, the fallback methods `searchAccessProfilesByNames` and `searchRolesByNames` were fetching all available objects using an empty filter, and then performing local filtering. This results in retrieving massive amounts of unnecessary data and hitting severe performance bottlenecks as the number of objects grows.
+**Action:** Instead of fetching all entities and filtering locally, use batched requests via `processConcurrent` along with an `in` filter (e.g., `name in ("x", "y")`). This limits the objects returned by the API strictly to what is needed and prevents both N+1 bottlenecks and massive payload sizes.
