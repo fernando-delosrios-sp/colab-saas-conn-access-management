@@ -586,28 +586,40 @@ export class ISCClient {
         const api = new AccessProfilesV2026Api(this.config)
         const results: LightweightAccessProfile[] = []
         
-        const response = await Paginator.paginate(api, api.listAccessProfiles as any, {})
-        const allAccessProfiles = response.data as any[]
-        
-        for (const accessProfile of allAccessProfiles) {
-            if (accessProfile.name && names.includes(accessProfile.name)) {
-                results.push({
-                    id: accessProfile.id!,
-                    name: accessProfile.name,
-                    entitlements: accessProfile.entitlements,
-                    requestable: accessProfile.requestable,
-                    accessRequestConfig: accessProfile.accessRequestConfig,
-                    enabled: accessProfile.enabled,
-                    app: accessProfile.app
-                        ? {
-                              id: accessProfile.app.id,
-                              name: accessProfile.app.name,
-                              accountSource: accessProfile.app.accountSource,
-                          }
-                        : undefined,
-                })
-            }
+        const BATCH_SIZE = 50
+        const chunks: string[][] = []
+        for (let i = 0; i < names.length; i += BATCH_SIZE) {
+            chunks.push(names.slice(i, i + BATCH_SIZE))
         }
+
+        // ⚡ Bolt: Push filtering to the server using 'in' filter to avoid fetching all entities
+        await processConcurrent(chunks, async (chunk) => {
+            const filterValue = chunk.map((name) => `"${escapeFilterString(name)}"`).join(',')
+            const filters = `name in (${filterValue})`
+            const response = await Paginator.paginate(api, api.listAccessProfiles as any, { filters })
+            const allAccessProfiles = response.data as any[]
+
+            for (const accessProfile of allAccessProfiles) {
+                if (accessProfile.name && chunk.includes(accessProfile.name)) {
+                    results.push({
+                        id: accessProfile.id!,
+                        name: accessProfile.name,
+                        entitlements: accessProfile.entitlements,
+                        requestable: accessProfile.requestable,
+                        accessRequestConfig: accessProfile.accessRequestConfig,
+                        enabled: accessProfile.enabled,
+                        app: accessProfile.app
+                            ? {
+                                  id: accessProfile.app.id,
+                                  name: accessProfile.app.name,
+                                  accountSource: accessProfile.app.accountSource,
+                              }
+                            : undefined,
+                    })
+                }
+            }
+        })
+
         logger.debug(`Fallback: Found ${results.length} access profiles by name: ${results.map(ap => ap.name).join(', ')}`)
         return results
     }
@@ -624,22 +636,34 @@ export class ISCClient {
         const api = new RolesV2026Api(this.config)
         const results: LightweightRole[] = []
         
-        const response = await Paginator.paginate(api, api.listRoles as any, {})
-        const allRoles = response.data as RoleV2026[]
-        
-        for (const role of allRoles) {
-            if (role.name && names.includes(role.name)) {
-                results.push({
-                    id: role.id!,
-                    name: role.name,
-                    entitlements: role.entitlements,
-                    requestable: role.requestable,
-                    accessRequestConfig: role.accessRequestConfig,
-                    membership: role.membership,
-                    enabled: role.enabled,
-                })
-            }
+        const BATCH_SIZE = 50
+        const chunks: string[][] = []
+        for (let i = 0; i < names.length; i += BATCH_SIZE) {
+            chunks.push(names.slice(i, i + BATCH_SIZE))
         }
+
+        // ⚡ Bolt: Push filtering to the server using 'in' filter to avoid fetching all entities
+        await processConcurrent(chunks, async (chunk) => {
+            const filterValue = chunk.map((name) => `"${escapeFilterString(name)}"`).join(',')
+            const filters = `name in (${filterValue})`
+            const response = await Paginator.paginate(api, api.listRoles as any, { filters })
+            const allRoles = response.data as RoleV2026[]
+
+            for (const role of allRoles) {
+                if (role.name && chunk.includes(role.name)) {
+                    results.push({
+                        id: role.id!,
+                        name: role.name,
+                        entitlements: role.entitlements,
+                        requestable: role.requestable,
+                        accessRequestConfig: role.accessRequestConfig,
+                        membership: role.membership,
+                        enabled: role.enabled,
+                    })
+                }
+            }
+        })
+
         logger.debug(`Fallback: Found ${results.length} roles by name: ${results.map(r => r.name).join(', ')}`)
         return results
     }
