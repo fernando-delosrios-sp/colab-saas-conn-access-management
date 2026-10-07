@@ -1,6 +1,21 @@
 import test from 'node:test'
 import assert from 'node:assert'
-import { evaluateVelocityExpression } from './velocity'
+import { evaluateVelocityExpression, isUnsafeVelocityAST } from './velocity'
+import velocityjs from 'velocityjs'
+
+test('isUnsafeVelocityAST should detect unsafe concatenations via #set', () => {
+    const unsafeConcat1 = velocityjs.parse("#set($c = 'constructor') $foo[$c]")
+    assert.strictEqual(isUnsafeVelocityAST(unsafeConcat1), true)
+
+    const unsafeConcat2 = velocityjs.parse("#set($c = 'con' + 'structor') $foo[$c]")
+    assert.strictEqual(isUnsafeVelocityAST(unsafeConcat2), true)
+
+    const unsafeConcat3 = velocityjs.parse("#set($a = 'con') #set($b = 'structor') #set($c = $a + $b) $foo[$c]")
+    assert.strictEqual(isUnsafeVelocityAST(unsafeConcat3), true)
+
+    const safeConcat = velocityjs.parse("#set($c = 'hello' + 'world') $foo[$c]")
+    assert.strictEqual(isUnsafeVelocityAST(safeConcat), false)
+})
 
 test('buildName should render template with entitlement attributes correctly', () => {
     const mockEntitlement = {

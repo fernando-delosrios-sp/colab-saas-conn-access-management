@@ -75,3 +75,14 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** The existing `hasConstructor` validation for Velocity templates in `src/utils/index.ts` only blocked access to the `constructor` and `__proto__` properties. It failed to prevent access to the `prototype` property, and it also allowed executing arbitrary macros like `#evaluate()`. This could allow Sandbox Escapes or Prototype Pollution in `velocityjs` to achieve Server-Side Template Injection (SSTI).
 **Learning:** AST-based validation for template engines must explicitly check for the `prototype` property and execution of macros (like `#evaluate()`) because attackers can use these paths to bypass basic sandbox checks and execute dynamic code.
 **Prevention:** The validation logic in `isUnsafeVelocityAST` must be updated to explicitly check for the `prototype` string inside identifiers and index properties. Furthermore, we must check for nodes of type `macro_call` where the identifier is `evaluate`.
+
+## 2024-05-24 - [Velocity Template Sandbox Escape via Dynamic Evaluation Bypass]
+
+**Vulnerability:**
+The `isUnsafeVelocityAST` validation logic successfully blocked direct access to unsafe properties like `constructor`, `__proto__`, and `prototype`, as well as string index access (`$foo['constructor']`). However, it failed to track variables assigned via the `#set` directive. An attacker could bypass the blocklist by assigning an unsafe property name to a variable (e.g., `#set($c = "constructor")`) or by using simple string concatenation (e.g., `#set($c = "con" + "structor")`), and then using that variable for dynamic property access (`$foo[$c]`).
+
+**Learning:**
+AST validation for template engines must be context-aware. Statically blocking specific string literals or identifiers in index accessors is insufficient if the language supports variables and string manipulation. Attackers will use these features to construct the blocked strings dynamically and bypass the checks.
+
+**Prevention:**
+The AST validation logic must track variable assignments. When a string or a concatenated string is assigned to a variable via `#set`, the validation must evaluate the resulting string and store it in an environment mapping. Then, when checking index nodes, it must also check if the referenced variable contains one of the blocked strings.
