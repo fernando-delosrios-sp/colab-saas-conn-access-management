@@ -1,5 +1,5 @@
 import { logger, ConnectorError } from '@sailpoint/connector-sdk'
-import { EntitlementV2026, RequestabilityForRoleV2026 } from 'sailpoint-api-client'
+import { EntitlementV2026, RequestabilityForRoleV2026, RoleMembershipSelectorV2026 } from 'sailpoint-api-client'
 import { ISCClient, LightweightRole } from '../isc-client'
 import { Config } from '../model/config'
 import { RoleProperties } from '../model/propertyDefinitions'
@@ -88,7 +88,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
         }
 
         // Check if assignment definition is independent of the group loop (static analysis)
-        let cachedMembership: any = undefined
+        let cachedMembership: RoleMembershipSelectorV2026 | undefined = undefined
         let isAssignmentLoopInvariant = false
 
         if (definition.assignmentDefinition) {
@@ -136,7 +136,8 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
             // Evaluate membership assignment definition
             if (definition.assignmentDefinition) {
                 if (isAssignmentLoopInvariant && cachedMembership) {
-                    roleProperties.membership = cachedMembership
+                    // Deep clone the object to avoid unintended shared reference mutations
+                    roleProperties.membership = JSON.parse(JSON.stringify(cachedMembership))
                 } else {
                     const assignmentContext: Record<string, unknown> = {
                         name: groupName,
