@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2024-10-09 - Push Filtering to the Server in Fallback Searches
+
+**Learning:** When fetching specific entities by name or ID in the SailPoint Connector SDK, using an empty filter (e.g., `listAccessProfiles` with `{}`) to fetch all entities for local in-memory filtering creates severe performance overhead and memory bloat, especially as tenant data grows.
+**Action:** Push the filtering to the server by chunking the identifiers into batches, constructing an `in` filter (e.g., `name in ("a", "b")`), and executing the batches concurrently via `processConcurrent` to efficiently retrieve only the required entities.
