@@ -75,3 +75,8 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** The existing `hasConstructor` validation for Velocity templates in `src/utils/index.ts` only blocked access to the `constructor` and `__proto__` properties. It failed to prevent access to the `prototype` property, and it also allowed executing arbitrary macros like `#evaluate()`. This could allow Sandbox Escapes or Prototype Pollution in `velocityjs` to achieve Server-Side Template Injection (SSTI).
 **Learning:** AST-based validation for template engines must explicitly check for the `prototype` property and execution of macros (like `#evaluate()`) because attackers can use these paths to bypass basic sandbox checks and execute dynamic code.
 **Prevention:** The validation logic in `isUnsafeVelocityAST` must be updated to explicitly check for the `prototype` string inside identifiers and index properties. Furthermore, we must check for nodes of type `macro_call` where the identifier is `evaluate`.
+
+## 2024-05-18 - Unsafe Dynamic Property Evaluation
+**Vulnerability:** Unsafe Dynamic Property Evaluation in `velocityjs` templates where `#set` directives allowed circumvention of static property checks.
+**Learning:** Static validation of Velocity ASTs must be context-aware. Restricted keys (like `constructor`) could be assigned to variables via string concatenation, then using those variables dynamically in property access (`$entitlement[$var]`).
+**Prevention:** Statically trace variable assignments and string concatenations within `#set` directives to resolve values, and apply dangerous identifier checks to all node types (including references and dynamic index lookups). Avoid globally blocking raw strings to prevent false positives.

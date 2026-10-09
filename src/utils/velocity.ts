@@ -1,11 +1,11 @@
 import velocityjs from 'velocityjs'
 
-function isUnsafeVelocityAST(nodes: any): boolean {
+function isUnsafeVelocityAST(nodes: any, env: Record<string, string> = {}): boolean {
     if (!nodes) return false
 
     if (Array.isArray(nodes)) {
         for (const node of nodes) {
-            if (isUnsafeVelocityAST(node)) return true
+            if (isUnsafeVelocityAST(node, env)) return true
         }
         return false
     }
@@ -13,22 +13,48 @@ function isUnsafeVelocityAST(nodes: any): boolean {
     if (typeof nodes === 'object') {
         const id = nodes.id
 
+        if (nodes.type === 'set' && Array.isArray(nodes.equal) && nodes.equal.length === 2) {
+            const target = nodes.equal[0]
+            const expr = nodes.equal[1]
+            if (target.type === 'references' && target.id) {
+                if (expr.type === 'string') {
+                    env[target.id] = expr.value
+                } else if (expr.type === 'math' && expr.operator === '+') {
+                    let val = ''
+                    let isStatic = true
+                    for (const operand of expr.expression) {
+                        if (operand.type === 'string') {
+                            val += operand.value
+                        } else if (operand.type === 'references' && operand.id && env[operand.id]) {
+                            val += env[operand.id]
+                        } else {
+                            isStatic = false
+                            break
+                        }
+                    }
+                    if (isStatic) env[target.id] = val
+                }
+            }
+        }
+
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
-        if (
-            id === 'constructor' ||
-            id === '__proto__' ||
-            id === 'prototype' ||
-            (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
-        )
-            return true
+        const isUnsafeTerm = (term: any) =>
+            term === 'constructor' || term === '__proto__' || term === 'prototype'
+
+        if (isUnsafeTerm(id)) return true
+
+        if (nodes.type === 'index' && id) {
+            let indexVal: any = undefined
+            if (id.type === 'string') indexVal = id.value
+            else if (id.type === 'references' && id.id && env[id.id]) indexVal = env[id.id]
+
+            if (isUnsafeTerm(indexVal)) return true
+        }
 
         for (const key of Object.keys(nodes)) {
-            if (isUnsafeVelocityAST(nodes[key])) return true
+            if (isUnsafeVelocityAST(nodes[key], env)) return true
         }
     }
 
