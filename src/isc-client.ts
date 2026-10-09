@@ -342,8 +342,7 @@ export class ISCClient {
                 requestable: isRequestable,
             },
         }
-        if (accessRequestConfig && isRequestable)
-            requestParameters.accessProfileV2026.accessRequestConfig = accessRequestConfig
+        if (accessRequestConfig && isRequestable) requestParameters.accessProfileV2026.accessRequestConfig = accessRequestConfig
 
         console.log(`[ISCClient] createAccessProfile payload: ${JSON.stringify(requestParameters, null, 2)}`)
 
@@ -400,7 +399,10 @@ export class ISCClient {
      * Bulk update entitlements (requestable, privileged, etc.). Max 50 entitlements per request.
      * @see https://developer.sailpoint.com/docs/api/v2026/update-entitlements-in-bulk
      */
-    async updateEntitlementsInBulk(entitlementIds: string[], jsonPatch: JsonPatchOperationV2026[]): Promise<void> {
+    async updateEntitlementsInBulk(
+        entitlementIds: string[],
+        jsonPatch: JsonPatchOperationV2026[]
+    ): Promise<void> {
         const api = new EntitlementsV2026Api(this.config)
         const body: EntitlementBulkUpdateRequestV2026 = {
             entitlementIds,
@@ -553,11 +555,7 @@ export class ISCClient {
             }
             const response = await api.searchPost({ searchV2026: searchRequest })
             const roles = response.data as any[]
-            logger.debug(
-                `Role search batch ${i / BATCH_SIZE + 1} returned ${roles.length} roles${
-                    roles.length > 0 ? ': ' + roles.map((r: any) => r.name).join(', ') : ''
-                }`
-            )
+            logger.debug(`Role search batch ${i / BATCH_SIZE + 1} returned ${roles.length} roles${roles.length > 0 ? ': ' + roles.map((r: any) => r.name).join(', ') : ''}`)
 
             for (const role of roles) {
                 if (role.id && role.name) {
@@ -610,9 +608,7 @@ export class ISCClient {
                 })
             }
         }
-        logger.debug(
-            `Fallback: Found ${results.length} access profiles by name: ${results.map((ap) => ap.name).join(', ')}`
-        )
+        logger.debug(`Fallback: Found ${results.length} access profiles by name: ${results.map(ap => ap.name).join(', ')}`)
         return results
     }
 
@@ -644,7 +640,7 @@ export class ISCClient {
                 })
             }
         }
-        logger.debug(`Fallback: Found ${results.length} roles by name: ${results.map((r) => r.name).join(', ')}`)
+        logger.debug(`Fallback: Found ${results.length} roles by name: ${results.map(r => r.name).join(', ')}`)
         return results
     }
 }
