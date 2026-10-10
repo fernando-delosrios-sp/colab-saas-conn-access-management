@@ -1,11 +1,11 @@
 import velocityjs from 'velocityjs'
 
-function isUnsafeVelocityAST(nodes: any): boolean {
+function isUnsafeVelocityAST(nodes: any, unsafeVariables: Set<string> = new Set()): boolean {
     if (!nodes) return false
 
     if (Array.isArray(nodes)) {
         for (const node of nodes) {
-            if (isUnsafeVelocityAST(node)) return true
+            if (isUnsafeVelocityAST(node, unsafeVariables)) return true
         }
         return false
     }
@@ -24,11 +24,46 @@ function isUnsafeVelocityAST(nodes: any): boolean {
                 id &&
                 id.type === 'string' &&
                 (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
-        )
+        ) {
             return true
+        }
+
+        if (nodes.type === 'index' && id && id.type === 'references' && unsafeVariables.has(id.id)) {
+            return true
+        }
+
+        if (nodes.type === 'references' && typeof id === 'string' && unsafeVariables.has(id)) {
+            return true
+        }
+
+        if (nodes.type === 'set' && Array.isArray(nodes.equal) && nodes.equal.length >= 2) {
+            const target = nodes.equal[0]
+            const expr = nodes.equal[1]
+
+            if (target && target.type === 'references') {
+                const varName = target.id
+                let val = ''
+
+                if (expr && expr.type === 'string') {
+                    val = expr.value
+                } else if (expr && expr.type === 'math' && expr.operator === '+') {
+                    if (Array.isArray(expr.expression)) {
+                        for (const p of expr.expression) {
+                            if (p && p.type === 'string') {
+                                val += p.value
+                            }
+                        }
+                    }
+                }
+
+                if (val === 'constructor' || val === '__proto__' || val === 'prototype') {
+                    unsafeVariables.add(varName)
+                }
+            }
+        }
 
         for (const key of Object.keys(nodes)) {
-            if (isUnsafeVelocityAST(nodes[key])) return true
+            if (isUnsafeVelocityAST(nodes[key], unsafeVariables)) return true
         }
     }
 

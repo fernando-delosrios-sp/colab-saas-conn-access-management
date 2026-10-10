@@ -75,3 +75,11 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** The existing `hasConstructor` validation for Velocity templates in `src/utils/index.ts` only blocked access to the `constructor` and `__proto__` properties. It failed to prevent access to the `prototype` property, and it also allowed executing arbitrary macros like `#evaluate()`. This could allow Sandbox Escapes or Prototype Pollution in `velocityjs` to achieve Server-Side Template Injection (SSTI).
 **Learning:** AST-based validation for template engines must explicitly check for the `prototype` property and execution of macros (like `#evaluate()`) because attackers can use these paths to bypass basic sandbox checks and execute dynamic code.
 **Prevention:** The validation logic in `isUnsafeVelocityAST` must be updated to explicitly check for the `prototype` string inside identifiers and index properties. Furthermore, we must check for nodes of type `macro_call` where the identifier is `evaluate`.
+## 2026-10-10 - Unsafe Dynamic Property Evaluation
+**Vulnerability:** Dynamic variable assignments within template #set directives permitted access to restricted properties via string concatenation.
+**Learning:** AST validators must be context-aware and stateful, statically tracking variable values to identify restricted properties masked by dynamic assignments.
+**Prevention:** Track string assignments and simple concatenations during AST traversal, flagging dynamic variables that resolve to restricted properties and blocking their subsequent usage.
+## 2026-10-10 - Node Engine Incompatability
+**Vulnerability:** Dependency updates (like `velocityjs@2.1.7`) can introduce newer Node.js engine requirements (`>=20.19.0`) that conflict with older CI runner environments (like Node.js v18).
+**Learning:** CI builds using `npm ci` will fail with an `EBADENGINE` error if the locked dependency version specifies a Node engine higher than what is available in the runner environment.
+**Prevention:** Pin the exact, older, compatible version of the dependency (e.g., `velocityjs@2.1.5`) in `package.json` using `--save-exact` and regenerate the lockfile to ensure the CI build passes successfully in the legacy environment.
