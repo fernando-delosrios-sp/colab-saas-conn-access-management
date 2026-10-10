@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2026-07-21 - Server-side Filtering for Fallback Searches
+
+**Learning:** Fetching all access profiles or roles without filters during fallback searches and performing local filtering causes severe N+1 memory issues and unbounded API overhead.
+**Action:** Always push exact-name matching to the server using `name in ("a", "b")` filters combined with batching to avoid excessive network round trips and limit memory overhead.

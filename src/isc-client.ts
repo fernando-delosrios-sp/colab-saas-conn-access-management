@@ -342,10 +342,11 @@ export class ISCClient {
                 requestable: isRequestable,
             },
         }
-        if (accessRequestConfig && isRequestable) requestParameters.accessProfileV2026.accessRequestConfig = accessRequestConfig
-        
+        if (accessRequestConfig && isRequestable)
+            requestParameters.accessProfileV2026.accessRequestConfig = accessRequestConfig
+
         console.log(`[ISCClient] createAccessProfile payload: ${JSON.stringify(requestParameters, null, 2)}`)
-        
+
         const response = await api.createAccessProfile(requestParameters)
         return response.data
     }
@@ -399,10 +400,7 @@ export class ISCClient {
      * Bulk update entitlements (requestable, privileged, etc.). Max 50 entitlements per request.
      * @see https://developer.sailpoint.com/docs/api/v2026/update-entitlements-in-bulk
      */
-    async updateEntitlementsInBulk(
-        entitlementIds: string[],
-        jsonPatch: JsonPatchOperationV2026[]
-    ): Promise<void> {
+    async updateEntitlementsInBulk(entitlementIds: string[], jsonPatch: JsonPatchOperationV2026[]): Promise<void> {
         const api = new EntitlementsV2026Api(this.config)
         const body: EntitlementBulkUpdateRequestV2026 = {
             entitlementIds,
@@ -509,7 +507,7 @@ export class ISCClient {
             }
             const response = await api.searchPost({ searchV2026: searchRequest })
             const accessProfiles = response.data as any[]
-            
+
             for (const ap of accessProfiles) {
                 if (ap.id && ap.name) {
                     results.push({
@@ -555,8 +553,10 @@ export class ISCClient {
             }
             const response = await api.searchPost({ searchV2026: searchRequest })
             const roles = response.data as any[]
-            logger.debug(`Role search batch ${i / BATCH_SIZE + 1} returned ${roles.length} roles${roles.length > 0 ? ': ' + roles.map((r: any) => r.name).join(', ') : ''}`)
-            
+            logger.debug(
+                `Role search batch ${i / BATCH_SIZE + 1} returned ${roles.length} roles${roles.length > 0 ? ': ' + roles.map((r: any) => r.name).join(', ') : ''}`
+            )
+
             for (const role of roles) {
                 if (role.id && role.name) {
                     results.push({
@@ -584,31 +584,52 @@ export class ISCClient {
         if (names.length === 0) return []
         logger.debug(`Fallback: Searching access profiles by name (${names.length} names)`)
         const api = new AccessProfilesV2026Api(this.config)
-        const results: LightweightAccessProfile[] = []
-        
-        const response = await Paginator.paginate(api, api.listAccessProfiles as any, {})
-        const allAccessProfiles = response.data as any[]
-        
-        for (const accessProfile of allAccessProfiles) {
-            if (accessProfile.name && names.includes(accessProfile.name)) {
-                results.push({
-                    id: accessProfile.id!,
-                    name: accessProfile.name,
-                    entitlements: accessProfile.entitlements,
-                    requestable: accessProfile.requestable,
-                    accessRequestConfig: accessProfile.accessRequestConfig,
-                    enabled: accessProfile.enabled,
-                    app: accessProfile.app
-                        ? {
-                              id: accessProfile.app.id,
-                              name: accessProfile.app.name,
-                              accountSource: accessProfile.app.accountSource,
-                          }
-                        : undefined,
-                })
-            }
+
+        const BATCH_SIZE = 50
+        const batches: string[][] = []
+        for (let i = 0; i < names.length; i += BATCH_SIZE) {
+            batches.push(names.slice(i, i + BATCH_SIZE))
         }
-        logger.debug(`Fallback: Found ${results.length} access profiles by name: ${results.map(ap => ap.name).join(', ')}`)
+
+        const nestedResults = await processConcurrent(
+            batches,
+            async (batch) => {
+                const filterValue = batch.map((n) => `"${escapeFilterString(n)}"`).join(',')
+                const filters = `name in (${filterValue})`
+                const requestParameters: AccessProfilesV2026ApiListAccessProfilesRequest = { filters }
+
+                const response = await Paginator.paginate(api, api.listAccessProfiles as any, requestParameters)
+                const allAccessProfiles = response.data as any[]
+
+                const results: LightweightAccessProfile[] = []
+                for (const accessProfile of allAccessProfiles) {
+                    if (accessProfile.name && names.includes(accessProfile.name)) {
+                        results.push({
+                            id: accessProfile.id!,
+                            name: accessProfile.name,
+                            entitlements: accessProfile.entitlements,
+                            requestable: accessProfile.requestable,
+                            accessRequestConfig: accessProfile.accessRequestConfig,
+                            enabled: accessProfile.enabled,
+                            app: accessProfile.app
+                                ? {
+                                      id: accessProfile.app.id,
+                                      name: accessProfile.app.name,
+                                      accountSource: accessProfile.app.accountSource,
+                                  }
+                                : undefined,
+                        })
+                    }
+                }
+                return results
+            },
+            5
+        )
+
+        const results = nestedResults.flat()
+        logger.debug(
+            `Fallback: Found ${results.length} access profiles by name: ${results.map((ap) => ap.name).join(', ')}`
+        )
         return results
     }
 
@@ -622,25 +643,44 @@ export class ISCClient {
         if (names.length === 0) return []
         logger.debug(`Fallback: Searching roles by name (${names.length} names)`)
         const api = new RolesV2026Api(this.config)
-        const results: LightweightRole[] = []
-        
-        const response = await Paginator.paginate(api, api.listRoles as any, {})
-        const allRoles = response.data as RoleV2026[]
-        
-        for (const role of allRoles) {
-            if (role.name && names.includes(role.name)) {
-                results.push({
-                    id: role.id!,
-                    name: role.name,
-                    entitlements: role.entitlements,
-                    requestable: role.requestable,
-                    accessRequestConfig: role.accessRequestConfig,
-                    membership: role.membership,
-                    enabled: role.enabled,
-                })
-            }
+
+        const BATCH_SIZE = 50
+        const batches: string[][] = []
+        for (let i = 0; i < names.length; i += BATCH_SIZE) {
+            batches.push(names.slice(i, i + BATCH_SIZE))
         }
-        logger.debug(`Fallback: Found ${results.length} roles by name: ${results.map(r => r.name).join(', ')}`)
+
+        const nestedResults = await processConcurrent(
+            batches,
+            async (batch) => {
+                const filterValue = batch.map((n) => `"${escapeFilterString(n)}"`).join(',')
+                const filters = `name in (${filterValue})`
+                const requestParameters: RolesV2026ApiListRolesRequest = { filters }
+
+                const response = await Paginator.paginate(api, api.listRoles as any, requestParameters)
+                const allRoles = response.data as RoleV2026[]
+
+                const results: LightweightRole[] = []
+                for (const role of allRoles) {
+                    if (role.name && names.includes(role.name)) {
+                        results.push({
+                            id: role.id!,
+                            name: role.name,
+                            entitlements: role.entitlements,
+                            requestable: role.requestable,
+                            accessRequestConfig: role.accessRequestConfig,
+                            membership: role.membership,
+                            enabled: role.enabled,
+                        })
+                    }
+                }
+                return results
+            },
+            5
+        )
+
+        const results = nestedResults.flat()
+        logger.debug(`Fallback: Found ${results.length} roles by name: ${results.map((r) => r.name).join(', ')}`)
         return results
     }
 }
