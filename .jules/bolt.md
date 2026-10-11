@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2024-05-24 - Role Aggregation Static Parsing Hoisting
+
+**Learning:** Velocity expressions and string-to-AST parsing operations (`stringToMembership`) within nested loops (entitlement groups) introduce severe O(N\*M) redundant CPU overhead when the definition string does not rely on iteration-specific context (like `$name` or `$entitlement`).
+**Action:** Use static regex analysis to determine if complex expressions rely on inner-loop variables. If independent, hoist the parsing operation outside the loop and cache the result to eliminate redundant parsing.
