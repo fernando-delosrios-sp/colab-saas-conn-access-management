@@ -59,6 +59,21 @@ test('buildName should handle missing attributes', () => {
     assert.strictEqual(result, 'Role: Admin - Dept: $department')
 })
 
+test('buildName should throw an error for unsafe dynamic property evaluation', () => {
+    const template = '#set($c = "con" + "structor")\n$a[$c]'
+    const context = { a: { constructor: () => 'Hacked!' } }
+
+    let error: Error | undefined
+    try {
+        evaluateVelocityExpression(template, context)
+    } catch (e: any) {
+        error = e
+    }
+
+    assert.ok(error, 'Should throw an error')
+    assert.match(error.message, /access to constructor/)
+})
+
 test('buildName should handle conditionals in template', () => {
     const mockEntitlement = {
         attributes: {
