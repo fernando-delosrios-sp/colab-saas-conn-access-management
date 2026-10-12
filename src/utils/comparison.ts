@@ -1,7 +1,4 @@
-export const areEntitlementRefsEqual = (
-    a?: { id?: string | null }[] | null,
-    b?: { id?: string | null }[]
-): boolean => {
+export const areEntitlementRefsEqual = (a?: { id?: string | null }[] | null, b?: { id?: string | null }[]): boolean => {
     const arrA = a ?? []
     const arrB = b ?? []
 
