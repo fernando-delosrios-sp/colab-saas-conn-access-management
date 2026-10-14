@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2026-10-14 - Hoist loop-invariant AST parsing for role aggregation
+
+**Learning:** In the SailPoint Connector SDK architecture, iterating through roles to parse the `assignmentDefinition` into a `RoleMembershipSelector` using `stringToMembership` is a complex parsing operation. When the `assignmentDefinition` lacks loop-specific dynamic variables (like `$name` or `$entitlement`), this operation is loop-invariant and generates redundant CPU overhead if evaluated for every entitlement group inside the loop.
+**Action:** Use static analysis (e.g. regex testing for dynamic Velocity variables) to identify if an expression relies on inner-loop context. If independent, hoist the `stringToMembership` parsing and `evaluateVelocityExpression` logic outside the inner loop to save CPU overhead and cache the single generated object.
