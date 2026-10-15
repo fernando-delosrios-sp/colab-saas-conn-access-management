@@ -1,11 +1,11 @@
 import velocityjs from 'velocityjs'
 
-function isUnsafeVelocityAST(nodes: any): boolean {
+function isUnsafeVelocityAST(nodes: any, env: Record<string, string> = {}): boolean {
     if (!nodes) return false
 
     if (Array.isArray(nodes)) {
         for (const node of nodes) {
-            if (isUnsafeVelocityAST(node)) return true
+            if (isUnsafeVelocityAST(node, env)) return true
         }
         return false
     }
@@ -16,19 +16,65 @@ function isUnsafeVelocityAST(nodes: any): boolean {
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
-        if (
-            id === 'constructor' ||
-            id === '__proto__' ||
-            id === 'prototype' ||
-            (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
-        )
-            return true
+        let idVal = undefined
+        if (typeof id === 'string') {
+            idVal = id
+        } else if (id && typeof id === 'object') {
+            if (id.type === 'string') {
+                idVal = id.value
+            } else if (id.type === 'references' && id.id && typeof id.id === 'string' && env[id.id] !== undefined) {
+                idVal = env[id.id]
+            }
+        }
+
+        if (idVal === 'constructor' || idVal === '__proto__' || idVal === 'prototype') return true
+
+        if (nodes.type === 'set' && Array.isArray(nodes.equal) && nodes.equal.length === 2) {
+            const target = nodes.equal[0]
+            const expr = nodes.equal[1]
+            if (target && target.type === 'references' && target.id && typeof target.id === 'string') {
+                if (expr && expr.type === 'string' && typeof expr.value === 'string') {
+                    env[target.id] = expr.value
+                } else if (
+                    expr &&
+                    expr.type === 'references' &&
+                    expr.id &&
+                    typeof expr.id === 'string' &&
+                    env[expr.id] !== undefined
+                ) {
+                    env[target.id] = env[expr.id]
+                } else if (expr && expr.type === 'math' && expr.operator === '+') {
+                    let concatenated = ''
+                    let allStrings = true
+                    if (Array.isArray(expr.expression)) {
+                        for (const exp of expr.expression) {
+                            if (exp && exp.type === 'string' && typeof exp.value === 'string') {
+                                concatenated += exp.value
+                            } else if (
+                                exp &&
+                                exp.type === 'references' &&
+                                exp.id &&
+                                typeof exp.id === 'string' &&
+                                env[exp.id] !== undefined
+                            ) {
+                                concatenated += env[exp.id]
+                            } else {
+                                allStrings = false
+                                break
+                            }
+                        }
+                    } else {
+                        allStrings = false
+                    }
+                    if (allStrings) {
+                        env[target.id] = concatenated
+                    }
+                }
+            }
+        }
 
         for (const key of Object.keys(nodes)) {
-            if (isUnsafeVelocityAST(nodes[key])) return true
+            if (isUnsafeVelocityAST(nodes[key], env)) return true
         }
     }
 
@@ -46,10 +92,7 @@ const templateCache = new Map<string, any>()
  * @returns Rendered string
  * @throws Error if template parsing or rendering fails
  */
-export function evaluateVelocityExpression(
-    template: string,
-    context: Record<string, unknown> = {}
-): string {
+export function evaluateVelocityExpression(template: string, context: Record<string, unknown> = {}): string {
     let velocity = templateCache.get(template)
     if (!velocity) {
         const velocityTemplate = velocityjs.parse(template)
