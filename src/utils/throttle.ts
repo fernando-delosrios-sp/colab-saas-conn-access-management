@@ -24,7 +24,7 @@ export async function throttle(): Promise<void> {
 
             const waitMs = timestamps[0] + WINDOW_MS - now
             if (waitMs > 0) {
-                await new Promise(resolve => setTimeout(resolve, waitMs))
+                await new Promise((resolve) => setTimeout(resolve, waitMs))
             }
         }
     })

@@ -1,10 +1,7 @@
 {
     "name": "Access Management",
     "description": "Automated entitlement governance connector for Identity Security Cloud. Enables bulk updates to entitlement properties, automated access profile and application creation and management, and role lifecycle management using flexible query-based selection and Velocity expressions.",
-    "commands": [
-        "std:entitlement:list",
-        "std:test-connection"
-    ],
+    "commands": ["std:entitlement:list", "std:test-connection"],
     "showDebugLoggingOption": true,
     "sourceConfigInitialValues": {
         "nameTemplate": "$name"

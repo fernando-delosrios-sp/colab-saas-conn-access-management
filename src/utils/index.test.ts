@@ -73,3 +73,15 @@ test('buildName should handle conditionals in template', () => {
     const result = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes)
     assert.strictEqual(result, 'Contractor')
 })
+
+test('evaluateVelocityExpression should block dynamically constructed unsafe properties', () => {
+    assert.throws(
+        () => evaluateVelocityExpression('#set($c = "con" + "structor")\n$a[$c]', { a: {} }),
+        /Invalid template: access to constructor/
+    )
+})
+
+test('evaluateVelocityExpression should allow safe string assignments', () => {
+    const result = evaluateVelocityExpression('#set($a = "constructor")\n$a', {})
+    assert.strictEqual(result, 'constructor')
+})
