@@ -1,4 +1,9 @@
-export type ApproverType = 'APP_OWNER' | 'OWNER' | 'SOURCE_OWNER' | 'MANAGER' | 'ENTITLEMENT_OWNER'
+export type ApproverType =
+    | 'APP_OWNER'
+    | 'OWNER'
+    | 'SOURCE_OWNER'
+    | 'MANAGER'
+    | 'ENTITLEMENT_OWNER'
 
 export interface Definition {
     name: string
