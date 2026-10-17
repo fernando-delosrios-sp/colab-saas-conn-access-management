@@ -16,16 +16,15 @@ function isUnsafeVelocityAST(nodes: any): boolean {
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
-        if (
-            id === 'constructor' ||
-            id === '__proto__' ||
-            id === 'prototype' ||
-            (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
-        )
-            return true
+        const banned = ['constructor', '__proto__', 'prototype', 'process', 'require', 'global']
+        if (typeof id === 'string' && banned.includes(id)) return true
+
+        // Block dynamic indexing evasion (e.g. $foo[$var] or $foo['pro' + 'cess'])
+        if (nodes.type === 'index' && id) {
+            // Only allow literal strings or integers as index to prevent AST obfuscation
+            if (id.type !== 'string' && id.type !== 'integer') return true
+            if (id.type === 'string' && banned.includes(id.value)) return true
+        }
 
         for (const key of Object.keys(nodes)) {
             if (isUnsafeVelocityAST(nodes[key])) return true
@@ -46,15 +45,14 @@ const templateCache = new Map<string, any>()
  * @returns Rendered string
  * @throws Error if template parsing or rendering fails
  */
-export function evaluateVelocityExpression(
-    template: string,
-    context: Record<string, unknown> = {}
-): string {
+export function evaluateVelocityExpression(template: string, context: Record<string, unknown> = {}): string {
     let velocity = templateCache.get(template)
     if (!velocity) {
         const velocityTemplate = velocityjs.parse(template)
         if (isUnsafeVelocityAST(velocityTemplate)) {
-            throw new Error('Invalid template: access to constructor, __proto__, or prototype is not allowed')
+            throw new Error(
+                'Invalid template: access to constructor, __proto__, prototype, process, require, or global is not allowed'
+            )
         }
         velocity = new velocityjs.Compile(velocityTemplate)
         templateCache.set(template, velocity)
