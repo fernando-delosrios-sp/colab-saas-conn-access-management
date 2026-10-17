@@ -73,3 +73,17 @@ test('buildName should handle conditionals in template', () => {
     const result = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes)
     assert.strictEqual(result, 'Contractor')
 })
+
+test('evaluateVelocityExpression should block dynamic string concatenation SSTI bypasses', () => {
+    const payloads = [
+        '#set($c = "con" + "structor")\n$foo[$c]',
+        '#set($p = "__pro" + "to__")\n$foo[$p]',
+        '#set($t = "proto" + "type")\n$foo[$t]',
+    ]
+
+    for (const payload of payloads) {
+        assert.throws(() => {
+            evaluateVelocityExpression(payload, { foo: {} })
+        }, /Invalid template: access to constructor, __proto__, or prototype is not allowed/)
+    }
+})
