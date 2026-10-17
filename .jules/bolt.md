@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2026-10-17 - Optimize list operations with "in" filter
+
+**Learning:** Fetching all items using `Paginator` over list APIs to perform local in-memory filtering creates a massive overhead.
+**Action:** Push filtering to the server using the `in` filter (e.g. `name in ("x", "y")`) and batch queries.
