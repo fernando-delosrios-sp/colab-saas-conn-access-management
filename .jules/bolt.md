@@ -62,3 +62,7 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## $(date +%Y-%m-%d) - Concurrency over Sequential Application Provisioning
+**Learning:** During application provisioning and updating within loops, sequential processing using `for...of` creates unnecessary delays due to sequential awaiting on synchronous I/O blocks (e.g. `await isc.createApp`). The application loop was specifically commented to avoid race conditions.
+**Action:** Utilizing concurrency models like `runWithConcurrency` alongside properly scoped asynchronous functions reduces waiting time but still guarantees state correctness when correctly configured.
