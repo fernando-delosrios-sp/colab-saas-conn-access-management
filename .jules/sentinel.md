@@ -75,3 +75,15 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** The existing `hasConstructor` validation for Velocity templates in `src/utils/index.ts` only blocked access to the `constructor` and `__proto__` properties. It failed to prevent access to the `prototype` property, and it also allowed executing arbitrary macros like `#evaluate()`. This could allow Sandbox Escapes or Prototype Pollution in `velocityjs` to achieve Server-Side Template Injection (SSTI).
 **Learning:** AST-based validation for template engines must explicitly check for the `prototype` property and execution of macros (like `#evaluate()`) because attackers can use these paths to bypass basic sandbox checks and execute dynamic code.
 **Prevention:** The validation logic in `isUnsafeVelocityAST` must be updated to explicitly check for the `prototype` string inside identifiers and index properties. Furthermore, we must check for nodes of type `macro_call` where the identifier is `evaluate`.
+
+## 2025-02-28 - [Server-Side Template Injection via Dynamic Velocity String Concatenation]
+
+**Vulnerability:** Attackers could bypass static literal AST checks for prototype pollution (SSTI/RCE) in `velocityjs` templates by dynamically concatenating strings within `#set` directives (e.g., `#set($c = "con" + "structor")`) and then using the constructed variable for property access (e.g., `$foo[$c]`).
+**Learning:** Checking explicit string literal identifiers in AST properties or indices is insufficient. The AST validation logic must recursively traverse `math` nodes within variable assignments to evaluate statically concatenated strings for blocked properties (like `constructor`, `__proto__`, `prototype`, `process`, etc.).
+**Prevention:** Always include logic to evaluate complex `math` and `string` nodes statically when inspecting template Abstract Syntax Trees (ASTs) for Server-Side Template Injection vectors.
+
+## 2025-02-28 - [Avoiding False Positives in Velocity AST Sandboxing]
+
+**Vulnerability:** Implementing overly aggressive AST node validation globally inside Velocity engines (e.g. blocking the string literal "constructor" unconditionally) breaks legitimate templating functions and strings like `#set($role = "constructor")` causing unintended application downtime.
+**Learning:** AST validation for template sandboxes must be context-aware. Banned strings should only be restricted in sensitive evaluation contexts (such as `index` node references) where prototype pollution or SSTI could occur, rather than globally across all nodes.
+**Prevention:** Keep track of defined variables in `#set` directives that evaluate to potentially dangerous literal strings. Verify that those specific variables (and directly dangerous string literals) are only blocked when actually used to index or access properties on other objects.
