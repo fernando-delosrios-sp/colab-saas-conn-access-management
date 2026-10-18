@@ -53,12 +53,17 @@
 **Learning:** Using a chunked `Promise.all` approach for concurrent operations can cause "head-of-line" blocking, where the entire chunk waits for the slowest request to complete before processing the next chunk.
 **Action:** Replace chunked `Promise.all` loops with a worker-pool concurrency model. This allows idle workers to instantly pull and process the next item in the queue, eliminating idle waiting and increasing throughput for network I/O bound operations.
 
-## $(date +%Y-%m-%d) - Pre-fetch entitlements for role definition queries concurrently
+## 2026-10-18 - Pre-fetch entitlements for role definition queries concurrently
 
 **Learning:** During role processing, iterating sequentially over role definitions and executing API queries inside the loop (`await isc.listEntitlements(definition.query)`) creates a massive N+1 query bottleneck, exacerbating network latency and slowing down execution.
 **Action:** Always pre-fetch nested dependencies in batches using a concurrency limiter (like `processConcurrent`) before entering inner loops, caching the results in a Map or Set to replace network I/O with O(1) memory lookups.
 
-## $(date +%Y-%m-%d) - Optimize JSON Patch payloads construction
+## 2026-10-18 - Optimize JSON Patch payloads construction
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2026-10-18 - Prevent unconstrained data fetch in fallback search APIs
+
+**Learning:** When a search query is passed an array of exact entity names to fall back to a direct list API, the underlying API client might pull all entities into memory using \`Paginator.paginate\` if it is not provided a filter. For large tenancies, downloading thousands of entities and doing an in-memory \`names.includes\` filter causes substantial CPU overhead, memory spikes, and network latency.
+**Action:** Always filter API queries server-side when resolving specific identifiers by explicitly passing an "in" filter parameter (e.g. \`name in ("name1", "name2")\`). To prevent URI too long errors from large filter strings, chunk the names list (e.g., using \`processConcurrent\`) into manageable sized API requests.
