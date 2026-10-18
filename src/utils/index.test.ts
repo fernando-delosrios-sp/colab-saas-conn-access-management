@@ -73,3 +73,46 @@ test('buildName should handle conditionals in template', () => {
     const result = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes)
     assert.strictEqual(result, 'Contractor')
 })
+
+test('buildName should block unsafe dynamic property access', () => {
+    const mockEntitlement = {
+        attributes: {},
+    } as any
+
+    const mockDefinition = {
+        nameTemplate: '#set($c = "con" + "structor")\n$a[$c]',
+    } as any
+
+    assert.throws(
+        () => evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes),
+        /Invalid template/
+    )
+})
+
+test('buildName should allow benign literal sets', () => {
+    const mockEntitlement = {
+        attributes: {},
+    } as any
+
+    const mockDefinition = {
+        nameTemplate: '#set($role = "constructor")\n$role',
+    } as any
+
+    const result = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes)
+    assert.strictEqual(result, 'constructor')
+})
+
+test('buildName should block unsafe dynamic property access with empty string', () => {
+    const mockEntitlement = {
+        attributes: {},
+    } as any
+
+    const mockDefinition = {
+        nameTemplate: '#set($c = "constructor" + "")\n$a[$c]',
+    } as any
+
+    assert.throws(
+        () => evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes),
+        /Invalid template/
+    )
+})
