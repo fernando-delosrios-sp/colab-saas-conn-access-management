@@ -53,12 +53,17 @@
 **Learning:** Using a chunked `Promise.all` approach for concurrent operations can cause "head-of-line" blocking, where the entire chunk waits for the slowest request to complete before processing the next chunk.
 **Action:** Replace chunked `Promise.all` loops with a worker-pool concurrency model. This allows idle workers to instantly pull and process the next item in the queue, eliminating idle waiting and increasing throughput for network I/O bound operations.
 
-## $(date +%Y-%m-%d) - Pre-fetch entitlements for role definition queries concurrently
+## 2026-10-19 - Pre-fetch entitlements for role definition queries concurrently
 
 **Learning:** During role processing, iterating sequentially over role definitions and executing API queries inside the loop (`await isc.listEntitlements(definition.query)`) creates a massive N+1 query bottleneck, exacerbating network latency and slowing down execution.
 **Action:** Always pre-fetch nested dependencies in batches using a concurrency limiter (like `processConcurrent`) before entering inner loops, caching the results in a Map or Set to replace network I/O with O(1) memory lookups.
 
-## $(date +%Y-%m-%d) - Optimize JSON Patch payloads construction
+## 2026-10-19 - Optimize JSON Patch payloads construction
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2026-10-19 - Hoist loop-invariant membership parsing
+
+**Learning:** When aggregating nested data entities across an array of definitions (like assigning roles based on a configuration block), parsing complex ASTs (like `stringToMembership`) unconditionally inside the group iteration loop creates massive CPU overhead and redundant evaluations, especially when the inputs (`assignmentDefinition`) are entirely independent of the inner loop's context.
+**Action:** When optimizing nested loops, use static analysis (e.g., regex checking for loop-specific variables like `name` or `entitlement`) to determine if complex parsing operations rely exclusively on parent-scoped configurations. If they are independent of the inner loop's context, hoist the parsing operation outside the loop and cache the result to eliminate redundant CPU overhead.
