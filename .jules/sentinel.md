@@ -75,3 +75,14 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** The existing `hasConstructor` validation for Velocity templates in `src/utils/index.ts` only blocked access to the `constructor` and `__proto__` properties. It failed to prevent access to the `prototype` property, and it also allowed executing arbitrary macros like `#evaluate()`. This could allow Sandbox Escapes or Prototype Pollution in `velocityjs` to achieve Server-Side Template Injection (SSTI).
 **Learning:** AST-based validation for template engines must explicitly check for the `prototype` property and execution of macros (like `#evaluate()`) because attackers can use these paths to bypass basic sandbox checks and execute dynamic code.
 **Prevention:** The validation logic in `isUnsafeVelocityAST` must be updated to explicitly check for the `prototype` string inside identifiers and index properties. Furthermore, we must check for nodes of type `macro_call` where the identifier is `evaluate`.
+
+## 2026-06-28 - [Unsafe Dynamic Property Evaluation via Context Variables]
+
+**Vulnerability:**
+The AST validation for velocity templates successfully blocked direct identifier and basic string index property evaluations for sensitive keys. However, it failed to track variables assigned via `#set` directives. This allowed unsafe dynamic property evaluations by assigning concatenated strings (e.g., `#set($c = "con" + "structor")`) or direct strings to variables and then using those variables as references in index accessors (e.g., `$a[$c]`).
+
+**Learning:**
+AST-based validation for template engines must be context-aware. If the template allows variable assignment, validation must statically trace those assignments within the AST and evaluate their values when they are subsequently referenced, especially inside index node evaluations.
+
+**Prevention:**
+The AST validation function has been refactored to maintain a dynamic variable tracking dictionary during traversal. It now intercepts `#set` nodes, statically evaluates string and math operations, stores the results in the tracker, and explicitly blocks dynamically resolved sensitive keys when used in index nodes or identifiers. The tracker is initialized with `Object.create(null)` to prevent unsafe property tracking.
