@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2024-05-30 - [Hoist Loop-Invariant Operations]
+
+**Learning:** Parsing operations (like Velocity templates or custom DSLs) within nested loops create O(n\*m) overhead. Statically analyzing expressions for loop-dependent variables allows these operations to be hoisted.
+**Action:** Before executing complex parsing inside an inner loop, use regex to check if it depends on loop context. If independent, hoist, parse once, and cache the result.
