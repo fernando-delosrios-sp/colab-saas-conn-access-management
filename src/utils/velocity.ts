@@ -40,7 +40,7 @@ function isUnsafeVelocityAST(nodes: any, vars: Record<string, any> = Object.crea
 
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
-        const checkValue = (val: string) => val === 'constructor' || val === '__proto__' || val === 'prototype'
+        const checkValue = (val: unknown) => val === 'constructor' || val === '__proto__' || val === 'prototype'
 
         let resolvedIdValue = null
         if (nodes.type === 'index' && id) {
