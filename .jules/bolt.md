@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2024-03-24 - Hoist loop-invariant role assignment evaluations
+
+**Learning:** Dynamic Velocity parsing of membership strings inside inner entitlement grouping loops causes massive N+1 bottlenecks when the assignment definition is independent of the loop context.
+**Action:** Use static regex analysis (`/\$!?\{?(name|entitlements?)\b\}?/`) to detect inner loop dependencies and hoist `stringToMembership` evaluations outside the loop to eliminate redundant parsing and API lookups.
