@@ -1,5 +1,5 @@
 import { logger, ConnectorError } from '@sailpoint/connector-sdk'
-import { EntitlementV2026, RequestabilityForRoleV2026 } from 'sailpoint-api-client'
+import { EntitlementV2026, RequestabilityForRoleV2026, RoleMembershipSelectorV2026 } from 'sailpoint-api-client'
 import { ISCClient, LightweightRole } from '../isc-client'
 import { Config } from '../model/config'
 import { RoleProperties } from '../model/propertyDefinitions'
@@ -54,6 +54,21 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
     // Phase 1: Collect entitlements and group them per definition
     roles: for (const definition of config.roles!) {
         logger.debug(`Processing definition: ${definition.name}`)
+
+        // ⚡ Bolt: Hoist static velocity evaluation and stringToMembership parsing outside the inner loop
+        // to avoid O(N) repeated CPU overhead for roles with assignments that do not depend on the inner context.
+        let cachedMembership: RoleMembershipSelectorV2026 | undefined = undefined
+        if (definition.assignmentDefinition) {
+            // Check if expression depends on loop-specific variables like $name or $entitlement(s)
+            const hasLoopVariables = /\$!?\{?(name|entitlements?)\b\}?/.test(definition.assignmentDefinition)
+            if (!hasLoopVariables) {
+                logger.debug('assignmentDefinition does not contain inner loop variables, hoisting evaluation')
+                const assignmentDefinitionStr = evaluateVelocityExpression(definition.assignmentDefinition, {
+                    definitionName: definition.name,
+                })
+                cachedMembership = await stringToMembership(assignmentDefinitionStr, sources)
+            }
+        }
         entitlementMap.clear()
         const entitlements = await isc.listEntitlements(definition.query)
         logger.debug(`Found ${entitlements.length} entitlements for definition ${definition.name}`)
@@ -117,24 +132,29 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
 
             // Evaluate membership assignment definition
             if (definition.assignmentDefinition) {
-                const assignmentContext: Record<string, unknown> = {
-                    name: groupName,
-                    definitionName: definition.name,
-                }
-
-                if (definition.groupEntitlements) {
-                    // Multiple entitlements grouped: provide all as 'entitlements'
-                    assignmentContext.entitlements = groupEntitlements
+                if (cachedMembership) {
+                    // ⚡ Bolt: Use the statically parsed AST to save processing time
+                    roleProperties.membership = cachedMembership
                 } else {
-                    // Single entitlement: provide as 'entitlement'
-                    assignmentContext.entitlement = groupEntitlements[0]
-                }
+                    const assignmentContext: Record<string, unknown> = {
+                        name: groupName,
+                        definitionName: definition.name,
+                    }
 
-                const assignmentDefinition = evaluateVelocityExpression(
-                    definition.assignmentDefinition,
-                    assignmentContext
-                )
-                roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
+                    if (definition.groupEntitlements) {
+                        // Multiple entitlements grouped: provide all as 'entitlements'
+                        assignmentContext.entitlements = groupEntitlements
+                    } else {
+                        // Single entitlement: provide as 'entitlement'
+                        assignmentContext.entitlement = groupEntitlements[0]
+                    }
+
+                    const assignmentDefinition = evaluateVelocityExpression(
+                        definition.assignmentDefinition,
+                        assignmentContext
+                    )
+                    roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
+                }
             }
 
             const existingRole = existingRoleMap.get(groupName)
