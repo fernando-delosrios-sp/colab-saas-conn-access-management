@@ -47,8 +47,7 @@ function isUnsafeVelocityAST(nodes: any, vars: Record<string, string> = Object.c
         if (
             isBlocked(id) ||
             (nodes.type === 'index' && id && id.type === 'string' && isBlocked(id.value)) ||
-            (nodes.type === 'index' && id && id.type === 'references' && id.id && isBlocked(vars[id.id])) ||
-            (nodes.type === 'references' && id && isBlocked(vars[id]))
+            (nodes.type === 'index' && id && id.type === 'references' && id.id && isBlocked(vars[id.id]))
         ) {
             return true
         }
