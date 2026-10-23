@@ -81,3 +81,9 @@ Always strictly validate or sandbox template execution contexts. In `velocityjs`
 **Vulnerability:** The existing `isUnsafeVelocityAST` logic statically checked for unsafe string literals (`constructor`, `__proto__`, `prototype`) in index accesses, but failed to track variables assigned via `#set` directives. This allowed unsafe dynamic property evaluations when strings were concatenated or assigned to intermediate variables (e.g., `#set($c = "con" + "structor")\n$a[$c]`).
 **Learning:** AST-based validation for template engines must be context-aware and dynamically track variable state throughout the template's execution flow. Simple string matching on node IDs is insufficient against obfuscation techniques like string concatenation and intermediate variable assignment.
 **Prevention:** The validation logic must be updated to statically track variable assignments (using a prototype-safe dictionary `Object.create(null)`) and evaluate basic expressions (like string concatenation) to resolve dynamic index access values during the AST traversal phase.
+
+## 2025-02-28 - [Unsafe Dynamic Property Evaluation via Inline Index Concatenation]
+
+**Vulnerability:** While AST-based static validation properly evaluated string variables from `#set` directives, it failed to resolve mathematical expressions (like string concatenation) used directly inline within `index` nodes (e.g., `$a["con" + "structor"]`). This allowed the validation to be bypassed entirely.
+**Learning:** AST evaluation logic must be recursively applied universally to all relevant nodes (including the id properties of index accesses) to correctly capture inline evaluations. Failing to do so leaves the static analysis vulnerable to simple obfuscation tricks.
+**Prevention:** In `isUnsafeVelocityAST`, always pass the `id` of an `index` node through the `evaluateExpr` function (e.g. `resolvedId = evaluateExpr(id, vars)`) rather than just checking if it is of type `'string'` or `'references'`.

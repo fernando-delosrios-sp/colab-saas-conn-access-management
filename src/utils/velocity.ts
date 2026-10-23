@@ -43,11 +43,7 @@ function isUnsafeVelocityAST(nodes: any, vars: Record<string, any> = Object.crea
 
         let resolvedId = typeof id === 'string' ? id : undefined
         if (nodes.type === 'index' && id && typeof id === 'object') {
-            if (id.type === 'string') {
-                resolvedId = id.value
-            } else if (id.type === 'references') {
-                resolvedId = vars[id.id]
-            }
+            resolvedId = evaluateExpr(id, vars)
         }
 
         if (resolvedId === 'constructor' || resolvedId === '__proto__' || resolvedId === 'prototype') {
