@@ -62,3 +62,7 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2026-10-25 - Hoist static Velocity expressions
+**Learning:** When evaluating Velocity expressions like role `assignmentDefinition` inside inner loops over many groups, if the template does not reference group-scoped variables (e.g., `$name`, `$entitlement`), the evaluation and subsequent complex string parsing (e.g., `stringToMembership`) become redundant overhead for every group.
+**Action:** Use a regex like `/\$!?\{?(name|entitlements?)\b\}?/` to statically analyze Velocity templates. If group-specific variables are absent, hoist the evaluation and parsing outside the loop to eliminate O(N) duplicate AST parsing work.
