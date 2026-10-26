@@ -82,7 +82,8 @@ test('evaluateVelocityExpression should block unsafe dynamic property evaluation
         /Invalid template/
     )
     assert.throws(
-        () => evaluateVelocityExpression('#set($prop = "constructor")\n$entitlement[$prop]', mockEntitlement.attributes),
+        () =>
+            evaluateVelocityExpression('#set($prop = "constructor")\n$entitlement[$prop]', mockEntitlement.attributes),
         /Invalid template/
     )
 })

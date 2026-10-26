@@ -29,11 +29,7 @@ function isUnsafeVelocityAST(nodes: any, vars: Record<string, string> = Object.c
 
         const resolvedId = typeof id === 'string' ? id : null
 
-        if (
-            resolvedId === 'constructor' ||
-            resolvedId === '__proto__' ||
-            resolvedId === 'prototype'
-        ) {
+        if (resolvedId === 'constructor' || resolvedId === '__proto__' || resolvedId === 'prototype') {
             return true
         }
 
@@ -53,17 +49,17 @@ function isUnsafeVelocityAST(nodes: any, vars: Record<string, string> = Object.c
 }
 
 function evaluateASTString(node: any, vars: Record<string, string>): string | null {
-    if (!node) return null;
-    if (node.type === 'string') return node.value;
-    if (node.type === 'references' && node.id) return vars[node.id] || null;
+    if (!node) return null
+    if (node.type === 'string') return node.value
+    if (node.type === 'references' && node.id) return vars[node.id] || null
     if (node.type === 'math' && node.operator === '+' && Array.isArray(node.expression)) {
-        const left = evaluateASTString(node.expression[0], vars);
-        const right = evaluateASTString(node.expression[1], vars);
+        const left = evaluateASTString(node.expression[0], vars)
+        const right = evaluateASTString(node.expression[1], vars)
         if (left !== null && right !== null) {
-            return left + right;
+            return left + right
         }
     }
-    return null;
+    return null
 }
 
 // ⚡ Bolt: Cache compiled velocity templates to avoid redundant parsing/compilation
@@ -77,10 +73,7 @@ const templateCache = new Map<string, any>()
  * @returns Rendered string
  * @throws Error if template parsing or rendering fails
  */
-export function evaluateVelocityExpression(
-    template: string,
-    context: Record<string, unknown> = {}
-): string {
+export function evaluateVelocityExpression(template: string, context: Record<string, unknown> = {}): string {
     let velocity = templateCache.get(template)
     if (!velocity) {
         const velocityTemplate = velocityjs.parse(template)
