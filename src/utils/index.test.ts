@@ -73,3 +73,16 @@ test('buildName should handle conditionals in template', () => {
     const result = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes)
     assert.strictEqual(result, 'Contractor')
 })
+
+test('evaluateVelocityExpression should block unsafe dynamic property evaluation through #set and concatenation', () => {
+    const mockEntitlement = { attributes: { constructor: 'hacked' } } as any
+
+    assert.throws(
+        () => evaluateVelocityExpression('#set($c = "con" + "structor")\n$entitlement[$c]', mockEntitlement.attributes),
+        /Invalid template/
+    )
+    assert.throws(
+        () => evaluateVelocityExpression('#set($prop = "constructor")\n$entitlement[$prop]', mockEntitlement.attributes),
+        /Invalid template/
+    )
+})

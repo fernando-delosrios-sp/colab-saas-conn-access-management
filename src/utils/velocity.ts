@@ -1,38 +1,69 @@
 import velocityjs from 'velocityjs'
 
-function isUnsafeVelocityAST(nodes: any): boolean {
+// Security: Track variable assignments and recursively evaluate string concatenations to prevent unsafe dynamic property evaluation.
+function isUnsafeVelocityAST(nodes: any, vars: Record<string, string> = Object.create(null)): boolean {
     if (!nodes) return false
 
     if (Array.isArray(nodes)) {
         for (const node of nodes) {
-            if (isUnsafeVelocityAST(node)) return true
+            if (isUnsafeVelocityAST(node, vars)) return true
         }
         return false
     }
 
     if (typeof nodes === 'object') {
+        if (nodes.type === 'set' && nodes.equal && Array.isArray(nodes.equal) && nodes.equal.length === 2) {
+            const [target, expr] = nodes.equal
+            if (target.type === 'references' && target.id) {
+                const val = evaluateASTString(expr, vars)
+                if (val !== null) {
+                    vars[target.id] = val
+                }
+            }
+        }
+
         const id = nodes.id
 
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
+        const resolvedId = typeof id === 'string' ? id : null
+
         if (
-            id === 'constructor' ||
-            id === '__proto__' ||
-            id === 'prototype' ||
-            (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
-        )
+            resolvedId === 'constructor' ||
+            resolvedId === '__proto__' ||
+            resolvedId === 'prototype'
+        ) {
             return true
+        }
+
+        if (nodes.type === 'index') {
+            const val = evaluateASTString(id, vars)
+            if (val === 'constructor' || val === '__proto__' || val === 'prototype') {
+                return true
+            }
+        }
 
         for (const key of Object.keys(nodes)) {
-            if (isUnsafeVelocityAST(nodes[key])) return true
+            if (isUnsafeVelocityAST(nodes[key], vars)) return true
         }
     }
 
     return false
+}
+
+function evaluateASTString(node: any, vars: Record<string, string>): string | null {
+    if (!node) return null;
+    if (node.type === 'string') return node.value;
+    if (node.type === 'references' && node.id) return vars[node.id] || null;
+    if (node.type === 'math' && node.operator === '+' && Array.isArray(node.expression)) {
+        const left = evaluateASTString(node.expression[0], vars);
+        const right = evaluateASTString(node.expression[1], vars);
+        if (left !== null && right !== null) {
+            return left + right;
+        }
+    }
+    return null;
 }
 
 // ⚡ Bolt: Cache compiled velocity templates to avoid redundant parsing/compilation
