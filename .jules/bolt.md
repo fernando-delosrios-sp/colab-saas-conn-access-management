@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2026-10-28 - Hoisting Static AST Parsing
+
+**Learning:** The stringToMembership function uses velocityjs to parse templates into ASTs. When evaluating assignment definitions for role-aggregation groups, if the definition lacks dynamic regex interpolation properties (name/entitlement), running stringToMembership in an O(N) loop introduces significant repetitive, static execution.
+**Action:** Evaluate static assignment definitions before iterating over entitlement groups and deep clone the parsed RoleMembershipSelectorV2026 object inside the loop to drastically reduce Velocity overhead.
