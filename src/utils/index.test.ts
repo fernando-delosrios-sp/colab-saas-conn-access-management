@@ -73,3 +73,18 @@ test('buildName should handle conditionals in template', () => {
     const result = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes)
     assert.strictEqual(result, 'Contractor')
 })
+
+test('Security: should block mathematical expressions bypassing AST evaluations via variable declarations', () => {
+    assert.throws(
+        () => {
+            evaluateVelocityExpression('#set($a = "con" + "structor")\n$obj[$a]')
+        },
+        {
+            message: 'Invalid template: access to constructor, __proto__, or prototype is not allowed',
+        }
+    )
+})
+
+test('Security: should allow normal variables', () => {
+    assert.strictEqual(evaluateVelocityExpression('#set($role = "constructor")\n$role'), 'constructor')
+})
