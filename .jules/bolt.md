@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2026-07-21 - Avoid Full Pagination for Filtered Lookups
+
+**Learning:** When falling back to alternative lookup methods (like searching by exact name when search API is unreliable), paginating the entire collection (`Paginator.paginate(api, api.listAccessProfiles, {})`) and filtering in-memory causes massive O(N) network congestion and memory exhaustion for large tenants.
+**Action:** Never paginate an entire remote collection just to find a subset of items. Always construct server-side filters (like chunked `name in ("a","b")` queries) and push the filtering down to the API.
