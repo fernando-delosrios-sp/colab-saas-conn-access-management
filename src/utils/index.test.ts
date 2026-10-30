@@ -73,3 +73,10 @@ test('buildName should handle conditionals in template', () => {
     const result = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes)
     assert.strictEqual(result, 'Contractor')
 })
+
+test('velocity block string concatenation bypass', () => {
+    const template = '#set($c = "con" + "structor")\n$a[$c]'
+    assert.throws(() => {
+        evaluateVelocityExpression(template, { a: {} })
+    }, /Invalid template/)
+})

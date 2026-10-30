@@ -1,11 +1,11 @@
 import velocityjs from 'velocityjs'
 
-function isUnsafeVelocityAST(nodes: any): boolean {
+function isUnsafeVelocityAST(nodes: any, vars: Record<string, string> = Object.create(null)): boolean {
     if (!nodes) return false
 
     if (Array.isArray(nodes)) {
         for (const node of nodes) {
-            if (isUnsafeVelocityAST(node)) return true
+            if (isUnsafeVelocityAST(node, vars)) return true
         }
         return false
     }
@@ -16,19 +16,42 @@ function isUnsafeVelocityAST(nodes: any): boolean {
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
-        if (
-            id === 'constructor' ||
-            id === '__proto__' ||
-            id === 'prototype' ||
-            (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
-        )
-            return true
+        const evaluateExpr = (node: any): string | undefined => {
+            if (!node) return undefined
+            if (node.type === 'string') return node.value
+            if (node.type === 'references' && node.id && vars[node.id] !== undefined) return vars[node.id]
+            if (node.type === 'math' && node.operator === '+') {
+                const left = evaluateExpr(node.expression[0])
+                const right = evaluateExpr(node.expression[1])
+                if (left !== undefined && right !== undefined) {
+                    return left + right
+                }
+            }
+            return undefined
+        }
+
+        if (nodes.type === 'set' && Array.isArray(nodes.equal) && nodes.equal.length === 2) {
+            const [target, expr] = nodes.equal
+            if (target.type === 'references' && target.id) {
+                const val = evaluateExpr(expr)
+                if (val !== undefined) {
+                    vars[target.id] = val
+                }
+            }
+        }
+
+        let evaluatedId = id
+        if (nodes.type === 'index' && id) {
+            const val = evaluateExpr(id)
+            if (val !== undefined) {
+                evaluatedId = val
+            }
+        }
+
+        if (evaluatedId === 'constructor' || evaluatedId === '__proto__' || evaluatedId === 'prototype') return true
 
         for (const key of Object.keys(nodes)) {
-            if (isUnsafeVelocityAST(nodes[key])) return true
+            if (isUnsafeVelocityAST(nodes[key], vars)) return true
         }
     }
 
@@ -46,10 +69,7 @@ const templateCache = new Map<string, any>()
  * @returns Rendered string
  * @throws Error if template parsing or rendering fails
  */
-export function evaluateVelocityExpression(
-    template: string,
-    context: Record<string, unknown> = {}
-): string {
+export function evaluateVelocityExpression(template: string, context: Record<string, unknown> = {}): string {
     let velocity = templateCache.get(template)
     if (!velocity) {
         const velocityTemplate = velocityjs.parse(template)
