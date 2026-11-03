@@ -62,3 +62,8 @@
 
 **Learning:** Unconditionally adding unchanged fields into JSON Patch payloads (e.g. updating large arrays like `entitlements` or `accessProfiles`) greatly inflates the request body size, leading to slower network I/O and longer API response processing times on the remote server.
 **Action:** When evaluating if an update is needed (e.g. after comparing existing objects to new data), conditionally append only the JSON Patch operations (`{op: 'replace' ...}`) for the fields that have explicitly changed.
+
+## 2026-11-03 - Cache Parsed Role Membership Objects in Loops
+
+**Learning:** When aggregating roles inside a loop across potentially multiple groups with identical `assignmentDefinition` values, executing `stringToMembership` logic repetitively on the same input strings can result in redundant AST parsing and operations, causing unnecessary performance overhead.
+**Action:** Implemented a `membershipCache` Map scoped inside `aggregateRoles` to memoize the results of `stringToMembership(assignmentDefinition, sources)`. The parsed `RoleMembershipSelectorV2026` objects are then deep-cloned via `JSON.parse(JSON.stringify(cachedMembership))` upon retrieval to ensure that object references remain isolated across iterations, preventing unintended mutation bugs while avoiding redundant parsing.
