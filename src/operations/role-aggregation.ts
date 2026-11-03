@@ -1,5 +1,5 @@
 import { logger, ConnectorError } from '@sailpoint/connector-sdk'
-import { EntitlementV2026, RequestabilityForRoleV2026 } from 'sailpoint-api-client'
+import { EntitlementV2026, RequestabilityForRoleV2026, RoleMembershipSelectorV2026 } from 'sailpoint-api-client'
 import { ISCClient, LightweightRole } from '../isc-client'
 import { Config } from '../model/config'
 import { RoleProperties } from '../model/propertyDefinitions'
@@ -35,6 +35,7 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
     const entitlementMap = new Map<string, EntitlementV2026[]>()
     const existingRoleMap = new Map<string, LightweightRole>()
     const allEntitlementIds = new Set<string>()
+    const membershipCache = new Map<string, RoleMembershipSelectorV2026>()
 
     // Find the connector's source (needed for ownerId)
     const sources = await isc.listSources()
@@ -134,7 +135,19 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
                     definition.assignmentDefinition,
                     assignmentContext
                 )
-                roleProperties.membership = await stringToMembership(assignmentDefinition, sources)
+
+                // ⚡ Bolt: Cache parsed membership objects by evaluated string to avoid redundant parsing in loops
+                let cachedMembership = membershipCache.get(assignmentDefinition)
+                if (!cachedMembership) {
+                    cachedMembership = await stringToMembership(assignmentDefinition, sources)
+                    membershipCache.set(assignmentDefinition, cachedMembership)
+                }
+
+                // ⚡ Bolt: Prevent unintended reference mutation bugs across iterations by spreading the cached object. Deep cloning using JSON.parse(JSON.stringify()) introduces serialization overhead that defeats the purpose of caching.
+                roleProperties.membership = {
+                    ...cachedMembership,
+                    criteria: cachedMembership.criteria ? { ...cachedMembership.criteria } : undefined
+                }
             }
 
             const existingRole = existingRoleMap.get(groupName)

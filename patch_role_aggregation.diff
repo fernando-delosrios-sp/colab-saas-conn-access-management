@@ -1,0 +1,10 @@
+<<<<<<< SEARCH
+                // Deep clone the cached object to prevent unintended reference mutation bugs across iterations
+                roleProperties.membership = JSON.parse(JSON.stringify(cachedMembership))
+=======
+                // ⚡ Bolt: No longer deep cloning the cached object using JSON.parse(JSON.stringify()) to prevent serialization overhead
+                roleProperties.membership = {
+                    ...cachedMembership,
+                    criteria: cachedMembership.criteria ? { ...cachedMembership.criteria } : undefined
+                }
+>>>>>>> REPLACE
