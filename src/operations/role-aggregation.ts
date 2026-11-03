@@ -143,8 +143,11 @@ export async function aggregateRoles(config: Config, isc: ISCClient): Promise<vo
                     membershipCache.set(assignmentDefinition, cachedMembership)
                 }
 
-                // Deep clone the cached object to prevent unintended reference mutation bugs across iterations
-                roleProperties.membership = JSON.parse(JSON.stringify(cachedMembership))
+                // ⚡ Bolt: Prevent unintended reference mutation bugs across iterations by spreading the cached object. Deep cloning using JSON.parse(JSON.stringify()) introduces serialization overhead that defeats the purpose of caching.
+                roleProperties.membership = {
+                    ...cachedMembership,
+                    criteria: cachedMembership.criteria ? { ...cachedMembership.criteria } : undefined
+                }
             }
 
             const existingRole = existingRoleMap.get(groupName)
