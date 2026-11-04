@@ -1,34 +1,78 @@
 import velocityjs from 'velocityjs'
 
-function isUnsafeVelocityAST(nodes: any): boolean {
+// Security: Prevent unsafe dynamic property evaluation by contextually tracking variable assignments and recursively resolving string concatenations.
+function evaluateNode(node: any, vars: any): any {
+    if (!node) return undefined
+    if (node.type === 'string') {
+        let val = node.value
+        if (node.isEval) {
+            val = val.replace(/\$!?\{?([a-zA-Z0-9_]+)\}?/g, (match: string, p1: string) => {
+                return vars[p1] !== undefined ? vars[p1] : match
+            })
+        }
+        return val
+    }
+    if (node.type === 'references' && node.id) {
+        return vars[node.id] !== undefined ? vars[node.id] : undefined
+    }
+    if (node.type === 'math' && node.operator === '+') {
+        const left = evaluateNode(node.expression[0], vars)
+        const right = evaluateNode(node.expression[1], vars)
+        if (left !== undefined && right !== undefined) {
+            return left + right
+        }
+    }
+    return undefined
+}
+
+function isUnsafeVelocityAST(nodes: any, vars: any = Object.create(null)): boolean {
     if (!nodes) return false
 
     if (Array.isArray(nodes)) {
         for (const node of nodes) {
-            if (isUnsafeVelocityAST(node)) return true
+            if (isUnsafeVelocityAST(node, vars)) return true
         }
         return false
     }
 
     if (typeof nodes === 'object') {
+        if (nodes.type === 'set' && nodes.equal && nodes.equal.length === 2) {
+            const target = nodes.equal[0]
+            const expr = nodes.equal[1]
+            if (target.type === 'references' && target.id) {
+                const val = evaluateNode(expr, vars)
+                if (val !== undefined) {
+                    vars[target.id] = val
+                }
+            }
+        }
+
         const id = nodes.id
 
         // Block macro evaluation logic
         if (nodes.type === 'macro_call' && id === 'evaluate') return true
 
+        let evaluatedId = typeof id === 'string' ? id : undefined
+
+        if (nodes.type === 'index' && id) {
+            evaluatedId = evaluateNode(id, vars) || (id && id.type === 'string' ? id.value : undefined)
+        } else if ((nodes.type === 'references' || nodes.type === 'property' || nodes.type === 'method') && id) {
+            evaluatedId = typeof id === 'string' ? id : undefined
+        }
+
+        // Security: Prevent unsafe dynamic property evaluation by contextually tracking variable assignments and recursively resolving string concatenations, ensuring property and method nodes are validated.
         if (
-            id === 'constructor' ||
-            id === '__proto__' ||
-            id === 'prototype' ||
-            (nodes.type === 'index' &&
-                id &&
-                id.type === 'string' &&
-                (id.value === 'constructor' || id.value === '__proto__' || id.value === 'prototype'))
-        )
+            (nodes.type === 'index' ||
+                nodes.type === 'references' ||
+                nodes.type === 'property' ||
+                nodes.type === 'method') &&
+            (evaluatedId === 'constructor' || evaluatedId === '__proto__' || evaluatedId === 'prototype')
+        ) {
             return true
+        }
 
         for (const key of Object.keys(nodes)) {
-            if (isUnsafeVelocityAST(nodes[key])) return true
+            if (isUnsafeVelocityAST(nodes[key], vars)) return true
         }
     }
 
@@ -46,10 +90,7 @@ const templateCache = new Map<string, any>()
  * @returns Rendered string
  * @throws Error if template parsing or rendering fails
  */
-export function evaluateVelocityExpression(
-    template: string,
-    context: Record<string, unknown> = {}
-): string {
+export function evaluateVelocityExpression(template: string, context: Record<string, unknown> = {}): string {
     let velocity = templateCache.get(template)
     if (!velocity) {
         const velocityTemplate = velocityjs.parse(template)
