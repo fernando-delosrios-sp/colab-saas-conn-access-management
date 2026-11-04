@@ -15,7 +15,13 @@ function evaluateNode(node: any, vars: any): any {
     if (node.type === 'references' && node.id) {
         return vars[node.id] !== undefined ? vars[node.id] : undefined
     }
-    if (node.type === 'math' && node.operator === '+') {
+    // Security: Prevent server crashes by safely checking expression arrays during mathematical evaluations.
+    if (
+        node.type === 'math' &&
+        node.operator === '+' &&
+        Array.isArray(node.expression) &&
+        node.expression.length >= 2
+    ) {
         const left = evaluateNode(node.expression[0], vars)
         const right = evaluateNode(node.expression[1], vars)
         if (left !== undefined && right !== undefined) {
