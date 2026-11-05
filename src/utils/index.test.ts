@@ -73,3 +73,23 @@ test('buildName should handle conditionals in template', () => {
     const result = evaluateVelocityExpression(mockDefinition.nameTemplate, mockEntitlement.attributes)
     assert.strictEqual(result, 'Contractor')
 })
+
+test('isUnsafeVelocityAST should block dynamic prototype pollution evaluations', () => {
+    const templates = [
+        '$a.constructor',
+        '$a.constructor()',
+        '#set($c = "constructor")\\n$a[$c]',
+        '#set($c = "con" + "structor")\\n$a[$c]',
+        '#set($b = "con")\\n#set($c = "structor")\\n#set($d = $b + $c)\\n$a[$d]',
+        '#set($empty = "")\\n#set($c = $empty + "constructor")\\n$a[$c]',
+        '$a["constructor"]',
+    ]
+
+    for (const t of templates) {
+        assert.throws(
+            () => evaluateVelocityExpression(t, { a: {} }),
+            /Invalid template: access to constructor, __proto__, or prototype is not allowed/,
+            `Failed to block template: ${t}`
+        )
+    }
+})
